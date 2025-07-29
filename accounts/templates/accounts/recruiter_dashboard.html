@@ -1,0 +1,151 @@
+{% extends 'base.html' %}
+
+{% block title %}Recruiter Dashboard - Pymetric{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  <div class="mb-8">
+    <h1 class="text-3xl font-bold text-gray-900">Recruiter Dashboard</h1>
+    <p class="text-gray-600 mt-2">Manage and review your assigned candidates</p>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    <!-- Candidates List -->
+    <div class="lg:col-span-1">
+      <div class="bg-white rounded-lg shadow-sm p-6">
+        <h2 class="text-xl font-semibold text-gray-900 mb-4">Assigned Candidates</h2>
+        <div class="space-y-3" id="candidateList">
+          {% for candidate in assigned_candidates %}
+            <div class="p-4 rounded-lg border cursor-pointer transition-colors border-gray-200 hover:border-gray-300" onclick="selectCandidate('{{ candidate.id }}')" data-user-id="{{ candidate.id }}">
+              <div class="flex items-center justify-between">
+                <div>
+                  <p class="font-medium text-gray-900">{{ candidate.first_name }} {{ candidate.last_name }}</p>
+                  <p class="text-sm text-gray-600">{{ candidate.email }}</p>
+                </div>
+              </div>
+            </div>
+          {% empty %}
+            <div class="text-gray-500">No candidates assigned.</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Candidate Details -->
+    <div class="lg:col-span-2" id="candidateDetails">
+      {% if selected_candidate %}
+        <div class="bg-white rounded-lg shadow-sm p-6 mb-6">
+          <h3 class="text-lg font-semibold text-gray-900 mb-4">Candidate Profile</h3>
+          {% if selected_candidate.profile %}
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <p class="text-sm text-gray-600">Position</p>
+                <p class="font-medium text-gray-900">{{ selected_candidate.profile.position }}</p>
+              </div>
+              <div>
+                <p class="text-sm text-gray-600">Experience</p>
+                <p class="font-medium text-gray-900">{{ selected_candidate.profile.experience }}</p>
+              </div>
+              <div class="md:col-span-2">
+                <p class="text-sm text-gray-600">Education</p>
+                <p class="font-medium text-gray-900">{{ selected_candidate.profile.education }}</p>
+              </div>
+              <div class="md:col-span-2">
+                <p class="text-sm text-gray-600">Skills</p>
+                <div class="flex flex-wrap gap-2 mt-1">
+                  {% for skill in selected_candidate.profile.skills %}
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">{{ skill }}</span>
+                  {% endfor %}
+                </div>
+              </div>
+            </div>
+          {% else %}
+            <p class="text-gray-500">No profile data available</p>
+          {% endif %}
+        </div>
+
+        <div class="bg-white rounded-lg shadow-sm p-6 mb-6">
+          <h3 class="text-lg font-semibold text-gray-900 mb-4">Game Results</h3>
+          {% if selected_candidate.game_results %}
+            <div class="space-y-3">
+              {% for result in selected_candidate.game_results %}
+                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div>
+                    <p class="font-medium text-gray-900">{{ result.game_id }}</p>
+                    <p class="text-sm text-gray-600">Duration: {{ result.duration_seconds }}s</p>
+                  </div>
+                  <div class="text-right">
+                    <p class="font-bold text-gray-900">{{ result.score }}/100</p>
+                    <p class="text-sm text-gray-600">Avg RT: {{ result.avg_reaction_time }}ms</p>
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <p class="text-gray-500">No game results available</p>
+          {% endif %}
+        </div>
+
+        <div class="bg-white rounded-lg shadow-sm p-6 mb-6">
+          <h3 class="text-lg font-semibold text-gray-900 mb-4">Recruiter Notes</h3>
+          <form method="post" id="notesForm">
+            {% csrf_token %}
+            <textarea name="notes" rows="4" class="w-full px-3 py-2 border border-gray-300 rounded-md" placeholder="Add notes about this candidate...">{{ selected_candidate.notes }}</textarea>
+            <div class="flex justify-end mt-2">
+              <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Save Notes</button>
+            </div>
+          </form>
+        </div>
+      {% else %}
+        <div class="text-center text-gray-500 py-16">Select a candidate to view details</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // Candidate selection
+  document.querySelectorAll('#candidateList [data-user-id]').forEach(function(item) {
+    item.addEventListener('click', function() {
+      const userId = this.getAttribute('data-user-id');
+      fetch(`?candidate_id=${userId}`, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(resp => resp.text())
+        .then(html => {
+          // Extract the candidateDetails div from the response
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(html, 'text/html');
+          const details = doc.querySelector('#candidateDetails');
+          if (details) {
+            document.getElementById('candidateDetails').innerHTML = details.innerHTML;
+            bindNotesForm();
+          }
+        });
+    });
+  });
+
+  function bindNotesForm() {
+    const notesForm = document.getElementById('notesForm');
+    if (notesForm) {
+      notesForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const formData = new FormData(notesForm);
+        fetch(window.location.href, {
+          method: 'POST',
+          body: formData,
+          headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+        .then(resp => resp.json())
+        .then(json => {
+          if (json.success) {
+            alert('Notes saved!');
+          } else {
+            alert('Failed to save notes.');
+          }
+        });
+      });
+    }
+  }
+  bindNotesForm();
+});
+</script>
+{% endblock %} 

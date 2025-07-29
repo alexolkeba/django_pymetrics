@@ -1,0 +1,284 @@
+{% extends 'base.html' %}
+
+{% block title %}Stop Signal Game - Rasmetric{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50">
+  <div class="max-w-4xl mx-auto px-4 py-8">
+    <button
+      onclick="window.location.href='{% url 'games:game_list' %}'"
+      class="flex items-center text-gray-600 hover:text-gray-900 mb-6"
+    >
+      <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+      </svg>
+      Back to Games
+    </button>
+
+    <div id="gameContainer" class="text-center">
+      <h2 class="text-2xl font-bold text-gray-900 mb-4">Stop Signal Task</h2>
+      <div class="bg-white rounded-lg shadow-sm p-8 mb-6">
+        <div class="flex justify-between items-center mb-6">
+          <div>
+            <p class="text-sm text-gray-600">Trial: <span id="trialDisplay">1</span>/40</p>
+            <p class="text-sm text-gray-600">Score: <span id="scoreDisplay">0</span></p>
+          </div>
+        </div>
+        <div class="h-64 flex items-center justify-center mb-6" id="stimulusArea"></div>
+        <div class="text-sm text-gray-600 space-y-2">
+          <p>Press ← (or A) for left arrows, → (or D) for right arrows</p>
+          <p class="font-semibold text-red-600">STOP if you see the red stop sign! 🛑</p>
+          <div id="stopPrompt"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="gameOverContainer" class="text-center hidden">
+      <h2 class="text-2xl font-bold text-gray-900 mb-4">Task Complete!</h2>
+      <div class="bg-blue-50 rounded-lg p-6 mb-6">
+        <p class="text-lg text-gray-700 mb-2">Final Score: <span id="finalScore" class="font-bold text-blue-600">0</span></p>
+        <p class="text-lg text-gray-700 mb-2">Stop Accuracy: <span id="finalCorrect" class="font-bold text-green-600">0</span>/<span id="finalTotal">0</span></p>
+        <p class="text-sm text-gray-600">Impulse Control: <span id="finalImpulse">0</span>%</p>
+      </div>
+      <button
+        onclick="window.location.href='{% url 'games:game_list' %}'"
+        class="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700"
+      >
+        Continue
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+const totalTrials = 40;
+const stopTrialProbability = 0.25;
+const ARROW_DISPLAY_TIME = 1200; // ms, total time arrow is visible
+const STOP_SIGNAL_DELAY_MIN = 400; // ms
+const STOP_SIGNAL_DELAY_MAX = 600; // ms
+const GO_TRIAL_TIMEOUT = 3000; // ms, max time to wait for user input on go trials
+const RESPONSE_FEEDBACK_TIME = 700; // ms
+const STOP_TRIAL_TIMEOUT = 3000; // ms, red arrow max display time
+
+let gameState = 'waiting';
+let currentTrial = 1;
+let arrowDirection = 'right';
+let isStopTrial = false;
+let hasStopSignal = false;
+let hasResponded = false;
+let startTime = Date.now();
+let trialStartTime = 0;
+let decisions = [];
+let reactionTimes = [];
+let score = 0;
+let stopSignalTimeout = null;
+let autoAdvanceTimeout = null;
+let responseFeedbackTimeout = null;
+let arrowDiv = null;
+let arrow = null;
+
+function clearAllTimeouts() {
+  clearTimeout(stopSignalTimeout);
+  clearTimeout(autoAdvanceTimeout);
+  clearTimeout(responseFeedbackTimeout);
+}
+
+function setGameState(state) {
+  gameState = state;
+  renderStimulus();
+}
+
+function renderStimulus() {
+  const area = document.getElementById('stimulusArea');
+  area.innerHTML = '';
+  document.getElementById('stopPrompt').innerHTML = '';
+  clearAllTimeouts();
+  arrowDiv = null;
+  arrow = null;
+  hasResponded = false;
+
+  if (gameState === 'waiting') {
+    area.innerHTML = '<div class="text-2xl text-gray-500">Get ready...</div>';
+    setTimeout(() => {
+      startTrial();
+    }, 1200);
+  } else if (gameState === 'arrow') {
+    const direction = Math.random() > 0.5 ? 'right' : 'left';
+    arrowDirection = direction;
+    isStopTrial = Math.random() < stopTrialProbability;
+    hasStopSignal = isStopTrial;
+    trialStartTime = Date.now();
+    arrowDiv = document.createElement('div');
+    arrowDiv.className = 'relative';
+    arrow = document.createElement('div');
+    arrow.className = isStopTrial ? 'text-8xl transition-all duration-100 text-red-500' : 'text-8xl transition-all duration-100 text-blue-600';
+    arrow.textContent = direction === 'left' ? '←' : '→';
+    arrowDiv.appendChild(arrow);
+    arrowDiv.id = 'arrowDiv';
+    area.appendChild(arrowDiv);
+    if (isStopTrial) {
+      // Remove stop sign icon for stop trial (do not append it)
+      document.getElementById('stopPrompt').innerHTML = '<p class="text-red-600 font-bold animate-pulse">STOP! Don\'t press any key!</p>';
+      autoAdvanceTimeout = setTimeout(() => {
+        if (!hasResponded) {
+          handleNoResponseStopTrial();
+        }
+      }, STOP_TRIAL_TIMEOUT);
+    }
+    // No auto-advance for go trials: wait indefinitely for user input
+  } else if (gameState === 'responded') {
+    // Feedback is set in showFeedback
+  } else if (gameState === 'finished') {
+    // handled elsewhere
+  }
+}
+
+function startTrial() {
+  setGameState('arrow');
+}
+
+function handleKeyPress(event) {
+  console.log('Keydown event:', event.key, 'gameState:', gameState, 'hasResponded:', hasResponded);
+  if (document.hasFocus() === false) {
+    alert('Click anywhere on the page to focus and enable keyboard input!');
+    return;
+  }
+  if (gameState !== 'arrow' || hasResponded) return;
+  if (isStopTrial) {
+    if (event.key === 'ArrowLeft' || event.key === 'a' || event.key === 'ArrowRight' || event.key === 'd') {
+      hasResponded = true;
+      handleResponse(event.key, true, 'Response recorded');
+    }
+  } else if (!isStopTrial) {
+    if (event.key === 'ArrowLeft' || event.key === 'a' || event.key === 'ArrowRight' || event.key === 'd') {
+      hasResponded = true;
+      handleResponse(event.key, false, '');
+    }
+  }
+}
+
+function handleResponse(key, failedStop, feedbackMsg) {
+  clearAllTimeouts();
+  const reactionTime = Date.now() - trialStartTime;
+  const correctKey = arrowDirection === 'left' ? 'ArrowLeft' : 'ArrowRight';
+  const isCorrectDirection = key === correctKey || (key === 'a' && arrowDirection === 'left') || (key === 'd' && arrowDirection === 'right');
+  let trialScore = 0;
+  let outcome = '';
+  let feedback = '';
+  if (isStopTrial && hasStopSignal) {
+    outcome = failedStop ? 'failed_stop' : 'correct_stop';
+    trialScore = failedStop ? -2 : 2;
+    feedback = failedStop ? 'Failed to stop!' : 'Correct stop!';
+  } else if (isStopTrial && !hasStopSignal) {
+    outcome = 'correct_go';
+    trialScore = isCorrectDirection ? 2 : -1;
+    feedback = isCorrectDirection ? 'Correct!' : 'Wrong key!';
+  } else {
+    outcome = isCorrectDirection ? 'correct_go' : 'incorrect_direction';
+    trialScore = isCorrectDirection ? 2 : -1;
+    feedback = isCorrectDirection ? 'Correct!' : 'Wrong key!';
+  }
+  score += trialScore;
+  reactionTimes.push(reactionTime);
+  decisions.push({
+    trial: currentTrial,
+    arrowDirection,
+    isStopTrial,
+    hasStopSignal,
+    keyPressed: key,
+    correctDirection: isCorrectDirection,
+    reactionTime,
+    outcome,
+    score: trialScore
+  });
+  showFeedback(feedback);
+}
+
+function handleNoResponseStopTrial() {
+  hasResponded = true;
+  showFeedback('Response recorded');
+}
+
+function handleNoResponseGoTrial() {
+  hasResponded = true;
+  handleResponse('none', false, 'Missed!');
+}
+
+function showFeedback(feedback) {
+  setGameState('responded');
+  const area = document.getElementById('stimulusArea');
+  area.innerHTML = `<div class="text-2xl text-green-600">${feedback}</div>`;
+  responseFeedbackTimeout = setTimeout(() => {
+    if (currentTrial < totalTrials) {
+      currentTrial++;
+      document.getElementById('trialDisplay').textContent = currentTrial;
+      document.getElementById('scoreDisplay').textContent = score;
+      setGameState('waiting');
+    } else {
+      endGame();
+    }
+  }, RESPONSE_FEEDBACK_TIME);
+}
+
+function endGame() {
+  gameState = 'finished';
+  document.getElementById('gameContainer').classList.add('hidden');
+  document.getElementById('gameOverContainer').classList.remove('hidden');
+  document.getElementById('finalScore').textContent = score;
+  const correctStops = decisions.filter(d => d.isStopTrial && d.hasStopSignal && d.outcome !== 'failed_stop').length;
+  const totalStopTrials = decisions.filter(d => d.isStopTrial && d.hasStopSignal).length;
+  document.getElementById('finalCorrect').textContent = correctStops;
+  document.getElementById('finalTotal').textContent = totalStopTrials;
+  document.getElementById('finalImpulse').textContent = Math.round((totalStopTrials > 0 ? correctStops / totalStopTrials : 0) * 100);
+  saveGameResult();
+}
+
+function saveGameResult() {
+  const totalTime = Date.now() - startTime;
+  const correctStops = decisions.filter(d => d.isStopTrial && d.hasStopSignal && d.outcome !== 'failed_stop').length;
+  const totalStopTrials = decisions.filter(d => d.isStopTrial && d.hasStopSignal).length;
+  const stopAccuracy = totalStopTrials > 0 ? correctStops / totalStopTrials : 0;
+  const gameData = {
+    game_type: 'stop_signal',
+    score: Math.max(0, Math.min(100, 50 + score)),
+    duration: totalTime,
+    decisions: decisions,
+    reaction_times: reactionTimes,
+    raw_data: {
+      finalScore: score,
+      stopAccuracy: stopAccuracy,
+      correctStops: correctStops,
+      totalStopTrials: totalStopTrials,
+      averageReactionTime: reactionTimes.length ? reactionTimes.reduce((a, b) => a + b, 0) / reactionTimes.length : 0,
+      impulseControl: stopAccuracy
+    }
+  };
+  fetch('{% url "games:save_game_result" %}', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+    },
+    body: JSON.stringify(gameData)
+  })
+  .then(response => response.json())
+  .then(data => {
+    console.log('Game result saved:', data);
+  })
+  .catch(error => {
+    console.error('Error saving game result:', error);
+  });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  setGameState('waiting');
+  // Only attach the event listener once
+  if (!window._stopSignalKeyListenerAttached) {
+    document.addEventListener('keydown', handleKeyPress);
+    window._stopSignalKeyListenerAttached = true;
+  }
+});
+</script>
+
+{% csrf_token %}
+{% endblock %} 

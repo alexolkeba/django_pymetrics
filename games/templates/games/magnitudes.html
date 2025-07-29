@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>Magnitudes Game</h2>
+<div id="magnitudes-game">
+    <label for="magnitude-input">Enter a magnitude:</label>
+    <input type="number" id="magnitude-input">
+    <button id="submit-magnitude">Submit</button>
+    <p id="status"></p>
+</div>
+<script>
+const sessionId = 'session_' + Date.now();
+function logEvent(eventType, eventData) {
+    fetch('/api/behavioral/events/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            session_id: sessionId,
+            event_type: eventType,
+            event_data: eventData
+        })
+    });
+}
+document.getElementById('submit-magnitude').onclick = function() {
+    const magnitude = document.getElementById('magnitude-input').value;
+    logEvent('magnitudes', {
+        magnitude: magnitude,
+        timestamp_milliseconds: Date.now()
+    });
+    document.getElementById('status').textContent = 'Magnitude submitted!';
+};
+</script>
+{% endblock %}

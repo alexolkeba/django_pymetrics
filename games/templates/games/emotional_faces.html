@@ -1,0 +1,209 @@
+{% extends 'base.html' %}
+
+{% block title %}Emotional Faces Game - Rasmetric{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50">
+  <div class="max-w-4xl mx-auto px-4 py-8">
+    <button
+      onclick="window.location.href='{% url 'games:game_list' %}'"
+      class="flex items-center text-gray-600 hover:text-gray-900 mb-6"
+    >
+      <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+      </svg>
+      Back to Games
+    </button>
+
+    <div id="gameContainer" class="text-center">
+      <h2 class="text-2xl font-bold text-gray-900 mb-4">Emotional Recognition</h2>
+      <div class="bg-white rounded-lg shadow-sm p-8 mb-6">
+        <div class="flex justify-between items-center mb-6">
+          <div>
+            <p class="text-sm text-gray-600">Round: <span id="roundDisplay">1</span>/20</p>
+            <p class="text-sm text-gray-600">Score: <span id="scoreDisplay">0</span></p>
+          </div>
+        </div>
+        <div id="faceArea"></div>
+      </div>
+    </div>
+
+    <div id="gameOverContainer" class="text-center hidden">
+      <h2 class="text-2xl font-bold text-gray-900 mb-4">Assessment Complete!</h2>
+      <div class="bg-blue-50 rounded-lg p-6 mb-6">
+        <p class="text-lg text-gray-700 mb-2">Final Score: <span id="finalScore" class="font-bold text-blue-600">0</span></p>
+        <p class="text-lg text-gray-700 mb-2">Correct: <span id="finalCorrect" class="font-bold text-green-600">0</span>/20</p>
+        <p class="text-sm text-gray-600">Emotional Recognition Accuracy: <span id="finalAccuracy">0</span>%</p>
+      </div>
+      <button
+        onclick="window.location.href='{% url 'games:game_list' %}'"
+        class="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700"
+      >
+        Continue
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+const totalRounds = 20;
+const emotions = ['happy', 'sad', 'angry', 'fear', 'surprise', 'disgust'];
+const emotionEmojis = {
+  happy: '😊',
+  sad: '😢',
+  angry: '😠',
+  fear: '😨',
+  surprise: '😲',
+  disgust: '🤢'
+};
+const faces = [
+  { id: 1, emotion: 'happy', intensity: 0.8, description: 'Joyful expression with raised cheeks' },
+  { id: 2, emotion: 'sad', intensity: 0.7, description: 'Downturned mouth with droopy eyes' },
+  { id: 3, emotion: 'angry', intensity: 0.9, description: 'Furrowed brow with tense jaw' },
+  { id: 4, emotion: 'fear', intensity: 0.6, description: 'Wide eyes with raised eyebrows' },
+  { id: 5, emotion: 'surprise', intensity: 0.8, description: 'Open mouth with wide eyes' },
+  { id: 6, emotion: 'disgust', intensity: 0.7, description: 'Wrinkled nose with raised upper lip' },
+  { id: 7, emotion: 'happy', intensity: 0.5, description: 'Subtle smile with bright eyes' },
+  { id: 8, emotion: 'sad', intensity: 0.9, description: 'Tears with deeply sad expression' },
+  { id: 9, emotion: 'angry', intensity: 0.6, description: 'Mild irritation with slight frown' },
+  { id: 10, emotion: 'fear', intensity: 0.8, description: 'Terrified expression with pale complexion' }
+];
+let round = 1;
+let score = 0;
+let gameOver = false;
+let startTime = Date.now();
+let roundStartTime = Date.now();
+let decisions = [];
+let reactionTimes = [];
+let feedback = null;
+let currentFace = null;
+
+function generateFace() {
+  currentFace = faces[Math.floor(Math.random() * faces.length)];
+  roundStartTime = Date.now();
+  feedback = null;
+  renderFaceArea();
+}
+function handleEmotionClick(selectedEmotion) {
+  const reactionTime = Date.now() - roundStartTime;
+  reactionTimes.push(reactionTime);
+  const isCorrect = selectedEmotion === currentFace.emotion;
+  decisions.push({
+    round: round,
+    faceId: currentFace.id,
+    correctEmotion: currentFace.emotion,
+    selectedEmotion: selectedEmotion,
+    correct: isCorrect,
+    intensity: currentFace.intensity,
+    reactionTime: reactionTime
+  });
+  if (isCorrect) {
+    score += 5;
+    feedback = 'Correct! ✓';
+  } else {
+    feedback = `Incorrect. This was ${currentFace.emotion}.`;
+  }
+  renderFaceArea();
+  setTimeout(() => {
+    if (round < totalRounds) {
+      round++;
+      document.getElementById('roundDisplay').textContent = round;
+      document.getElementById('scoreDisplay').textContent = score;
+      generateFace();
+    } else {
+      endGame();
+    }
+  }, 1500);
+}
+function renderFaceArea() {
+  const area = document.getElementById('faceArea');
+  area.innerHTML = '';
+  if (!currentFace) return;
+  const prompt = document.createElement('p');
+  prompt.className = 'text-lg text-gray-700 mb-6';
+  prompt.textContent = 'What emotion is this face expressing?';
+  area.appendChild(prompt);
+  // Face display
+  const faceDiv = document.createElement('div');
+  faceDiv.className = 'w-32 h-32 mx-auto bg-gradient-to-br from-yellow-100 to-yellow-200 rounded-full flex items-center justify-center text-6xl border-4 border-yellow-300 shadow-lg';
+  faceDiv.textContent = emotionEmojis[currentFace.emotion];
+  area.appendChild(faceDiv);
+  const desc = document.createElement('p');
+  desc.className = 'text-sm text-gray-500 mt-2';
+  desc.textContent = currentFace.description;
+  area.appendChild(desc);
+  if (feedback) {
+    const feedbackDiv = document.createElement('div');
+    feedbackDiv.className = `mb-6 p-3 rounded-lg text-lg font-semibold ${feedback.includes('Correct') ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`;
+    feedbackDiv.textContent = feedback;
+    area.appendChild(feedbackDiv);
+  } else {
+    const grid = document.createElement('div');
+    grid.className = 'grid grid-cols-2 md:grid-cols-3 gap-4 max-w-lg mx-auto';
+    emotions.forEach(emotion => {
+      const btn = document.createElement('button');
+      btn.className = 'bg-gray-100 hover:bg-gray-200 border-2 border-gray-300 rounded-lg p-4 text-lg font-medium text-gray-800 transition-colors flex flex-col items-center';
+      btn.appendChild(document.createTextNode(emotion.charAt(0).toUpperCase() + emotion.slice(1)));
+      btn.onclick = () => handleEmotionClick(emotion);
+      grid.appendChild(btn);
+    });
+    area.appendChild(grid);
+  }
+}
+function endGame() {
+  gameOver = true;
+  document.getElementById('gameContainer').classList.add('hidden');
+  document.getElementById('gameOverContainer').classList.remove('hidden');
+  document.getElementById('finalScore').textContent = score;
+  const correct = decisions.filter(d => d.correct).length;
+  document.getElementById('finalCorrect').textContent = correct;
+  document.getElementById('finalAccuracy').textContent = Math.round((correct / totalRounds) * 100);
+  saveGameResult();
+}
+function saveGameResult() {
+  const totalTime = Date.now() - startTime;
+  const accuracy = decisions.filter(d => d.correct).length / decisions.length;
+  const emotionAccuracy = {};
+  emotions.forEach(emotion => {
+    const emotionDecisions = decisions.filter(d => d.correctEmotion === emotion);
+    emotionAccuracy[emotion] = emotionDecisions.length > 0 ? emotionDecisions.filter(d => d.correct).length / emotionDecisions.length : 0;
+  });
+  const gameData = {
+    game_type: 'emotional_faces',
+    score: Math.min(score, 100),
+    duration: totalTime,
+    decisions: decisions,
+    reaction_times: reactionTimes,
+    raw_data: {
+      finalScore: score,
+      accuracy: accuracy,
+      averageReactionTime: reactionTimes.length ? reactionTimes.reduce((a, b) => a + b, 0) / reactionTimes.length : 0,
+      correctAnswers: decisions.filter(d => d.correct).length,
+      emotionAccuracy: emotionAccuracy
+    }
+  };
+  fetch('{% url "games:save_game_result" %}', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+    },
+    body: JSON.stringify(gameData)
+  })
+  .then(response => response.json())
+  .then(data => {
+    console.log('Game result saved:', data);
+  })
+  .catch(error => {
+    console.error('Error saving game result:', error);
+  });
+}
+document.addEventListener('DOMContentLoaded', function() {
+  generateFace();
+  document.getElementById('roundDisplay').textContent = round;
+  document.getElementById('scoreDisplay').textContent = score;
+});
+</script>
+
+{% csrf_token %}
+{% endblock %} 

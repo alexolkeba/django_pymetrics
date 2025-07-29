@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Rasmetric Psychometric Platform{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
+        .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .card-shadow { box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1); }
+        .hover-lift { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+        .hover-lift:hover { transform: translateY(-2px); box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15); }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Navigation -->
+    <nav class="gradient-bg text-white shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center">
+                    <a href="/" class="text-xl font-bold">🧠 Rasmetric</a>
+                </div>
+                
+                <div class="flex items-center space-x-4">
+                    {% if user.is_authenticated %}
+                        <span class="text-sm opacity-90">Welcome, {{ user.username }}</span>
+                        {% if user.role == 'ADMIN' %}
+                            <a href="{% url 'admin_dashboard' %}" class="text-white hover:text-gray-200 px-3 py-2 rounded-md text-sm font-medium">Admin Dashboard</a>
+                        {% elif user.role == 'RECRUITER' %}
+                            <a href="{% url 'recruiter_dashboard' %}" class="text-white hover:text-gray-200 px-3 py-2 rounded-md text-sm font-medium">Recruiter Dashboard</a>
+                        {% elif user.role == 'CANDIDATE' %}
+                            <a href="{% url 'candidate_dashboard' %}" class="text-white hover:text-gray-200 px-3 py-2 rounded-md text-sm font-medium">My Dashboard</a>
+                            <a href="{% url 'game_list' %}" class="text-white hover:text-gray-200 px-3 py-2 rounded-md text-sm font-medium">Take Assessment</a>
+                        {% endif %}
+                        <a href="{% url 'logout' %}" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium">Logout</a>
+                    {% else %}
+                        <a href="{% url 'login' %}" class="text-white hover:text-gray-200 px-3 py-2 rounded-md text-sm font-medium">Login</a>
+                        <a href="{% url 'register' %}" class="bg-white text-purple-600 hover:bg-gray-100 px-4 py-2 rounded-md text-sm font-medium">Register</a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {% if messages %}
+            <div class="mb-6">
+                {% for message in messages %}
+                    <div class="bg-{{ message.tags }}-100 border border-{{ message.tags }}-400 text-{{ message.tags }}-700 px-4 py-3 rounded relative" role="alert">
+                        <span class="block sm:inline">{{ message }}</span>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-white mt-16">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div>
+                    <h3 class="text-lg font-semibold mb-4">🧠 Rasmetric Platform</h3>
+                    <p class="text-gray-300 text-sm">
+                        Advanced psychometric assessment platform for modern recruitment.
+                    </p>
+                </div>
+                <div>
+                    <h4 class="text-md font-semibold mb-4">Quick Links</h4>
+                    <ul class="space-y-2 text-sm text-gray-300">
+                        {% if user.is_authenticated %}
+                            {% if user.role == 'CANDIDATE' %}
+                                <li><a href="{% url 'game_list' %}" class="hover:text-white">Take Assessment</a></li>
+                                <li><a href="{% url 'candidate_dashboard' %}" class="hover:text-white">My Results</a></li>
+                            {% elif user.role == 'RECRUITER' %}
+                                <li><a href="{% url 'recruiter_dashboard' %}" class="hover:text-white">Candidate Management</a></li>
+                            {% elif user.role == 'ADMIN' %}
+                                <li><a href="{% url 'admin_dashboard' %}" class="hover:text-white">Analytics Dashboard</a></li>
+                            {% endif %}
+                        {% else %}
+                            <li><a href="{% url 'login' %}" class="hover:text-white">Login</a></li>
+                            <li><a href="{% url 'register' %}" class="hover:text-white">Register</a></li>
+                        {% endif %}
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="text-md font-semibold mb-4">Legal & Privacy</h4>
+                    <div class="text-sm text-gray-300 space-y-2">
+                        <p><strong>GDPR Compliant:</strong> All data is handled in compliance with GDPR regulations.</p>
+                        <p><strong>Consent Required:</strong> Explicit consent is required for all data collection.</p>
+                        <p><strong>Data Protection:</strong> Your privacy and data security are our top priorities.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="border-t border-gray-700 mt-8 pt-8 text-center text-sm text-gray-400">
+                <p>&copy; {% now "Y" %} Rasmetric Psychometric Platform. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    {% block extra_js %}{% endblock %}
+</body>
+</html> 

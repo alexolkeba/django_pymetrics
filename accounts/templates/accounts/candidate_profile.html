@@ -1,0 +1,245 @@
+{% extends 'base.html' %}
+
+{% block title %}Candidate Profile - Pymetric{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  <div class="mb-8">
+    <h1 class="text-3xl font-bold text-gray-900">Candidate Profile</h1>
+    <p class="text-gray-600 mt-2">Complete your profile to get started with the assessment</p>
+  </div>
+
+  <div class="bg-white rounded-lg shadow-sm p-6 mb-8">
+    <div class="flex items-center justify-between mb-6">
+      <h2 class="text-xl font-semibold text-gray-900">Personal Information</h2>
+      <button id="editProfileBtn" class="text-blue-600 hover:text-blue-700 font-medium">Edit Profile</button>
+    </div>
+    <form id="profileForm" enctype="multipart/form-data">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
+          <input type="text" id="fullName" value="{{ user.first_name }} {{ user.last_name }}" disabled class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-600" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
+          <input type="email" id="email" value="{{ user.email }}" disabled class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-600" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Position Applied For</label>
+          <input type="text" id="position" name="position" value="{{ profile.position }}" disabled class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50" placeholder="e.g., Software Engineer" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Years of Experience</label>
+          <select id="experience" name="experience" disabled class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50">
+            <option value="">Select experience level</option>
+            <option value="0-1" {% if profile.experience == '0-1' %}selected{% endif %}>0-1 years</option>
+            <option value="2-5" {% if profile.experience == '2-5' %}selected{% endif %}>2-5 years</option>
+            <option value="6-10" {% if profile.experience == '6-10' %}selected{% endif %}>6-10 years</option>
+            <option value="10+" {% if profile.experience == '10+' %}selected{% endif %}>10+ years</option>
+          </select>
+        </div>
+        <div class="md:col-span-2">
+          <label class="block text-sm font-medium text-gray-700 mb-2">Education</label>
+          <textarea id="education" name="education" disabled rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50" placeholder="e.g., Bachelor's in Computer Science, MIT">{{ profile.education }}</textarea>
+        </div>
+        <div class="md:col-span-2">
+          <label class="block text-sm font-medium text-gray-700 mb-2">Skills</label>
+          <div id="skillsContainer" class="flex flex-wrap gap-2 mb-2">
+            {% for skill in profile.skills %}
+            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+              {{ skill }}
+              <button type="button" class="ml-2 text-blue-600 hover:text-blue-800 remove-skill-btn" data-skill="{{ skill }}">×</button>
+            </span>
+            {% endfor %}
+          </div>
+          <div class="flex mb-2">
+            <input type="text" id="skillInput" class="flex-1 px-3 py-2 border border-gray-300 rounded-l-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Add a skill" />
+            <button type="button" id="addSkillBtn" class="px-4 py-2 bg-blue-600 text-white rounded-r-md hover:bg-blue-700">Add</button>
+          </div>
+        </div>
+      </div>
+      <div class="mt-6 pt-6 border-t border-gray-200">
+        <div class="flex items-center mb-4">
+          <input type="checkbox" id="consent" name="consent" {% if profile.consent_given %}checked{% endif %} disabled class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" />
+          <label for="consent" class="ml-2 block text-sm text-gray-700">
+            I consent to the collection and processing of my personal data for assessment purposes
+          </label>
+        </div>
+        <div class="flex justify-end space-x-4">
+          <button type="button" id="cancelEditBtn" class="px-4 py-2 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 hidden">Cancel</button>
+          <button type="submit" id="saveProfileBtn" disabled class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed hidden">Save Profile</button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <!-- File Upload Section -->
+  <div class="bg-white rounded-lg shadow-sm p-6 mb-8">
+    <h2 class="text-xl font-semibold text-gray-900 mb-4">Documents</h2>
+    <div class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Resume/CV</label>
+        <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+          <input type="file" id="resumeUpload" name="resume" accept=".pdf,.doc,.docx" class="hidden" />
+          <label for="resumeUpload" class="cursor-pointer">
+            <span class="text-sm text-gray-600">Click to upload your resume or drag and drop</span>
+            <p class="text-xs text-gray-500 mt-1">PDF, DOC, or DOCX up to 10MB</p>
+          </label>
+        </div>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Video Introduction (Optional)</label>
+        <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+          <input type="file" id="videoUpload" name="video" accept=".mp4,.mov" class="hidden" />
+          <label for="videoUpload" class="cursor-pointer">
+            <span class="text-sm text-gray-600">Upload a brief video introduction</span>
+            <p class="text-xs text-gray-500 mt-1">MP4 or MOV up to 100MB</p>
+          </label>
+          {% if profile.video %}
+            <div class="mt-4">
+              <video width="320" height="180" controls>
+                <source src="{{ profile.video.url }}" type="video/mp4">
+                Your browser does not support the video tag.
+              </video>
+              <div class="mt-2">
+                <a href="{{ profile.video.url }}" class="text-blue-600 hover:underline" download>Download Video</a>
+              </div>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Profile Completion Status -->
+  <div class="bg-white rounded-lg shadow-sm p-6">
+    <h2 class="text-xl font-semibold text-gray-900 mb-4">Profile Completion</h2>
+    <div class="space-y-3">
+      <div class="flex items-center">
+        <span class="h-5 w-5 mr-2 rounded-full bg-green-500 inline-block"></span>
+        <span class="text-sm text-gray-700">Position information</span>
+      </div>
+      <div class="flex items-center">
+        <span class="h-5 w-5 mr-2 rounded-full bg-green-500 inline-block"></span>
+        <span class="text-sm text-gray-700">Experience level</span>
+      </div>
+      <div class="flex items-center">
+        <span class="h-5 w-5 mr-2 rounded-full bg-green-500 inline-block"></span>
+        <span class="text-sm text-gray-700">Education background</span>
+      </div>
+      <div class="flex items-center">
+        <span class="h-5 w-5 mr-2 rounded-full bg-green-500 inline-block"></span>
+        <span class="text-sm text-gray-700">Skills</span>
+      </div>
+      <div class="flex items-center">
+        <span class="h-5 w-5 mr-2 rounded-full bg-green-500 inline-block"></span>
+        <span class="text-sm text-gray-700">Data consent</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const editBtn = document.getElementById('editProfileBtn');
+  const cancelBtn = document.getElementById('cancelEditBtn');
+  const saveBtn = document.getElementById('saveProfileBtn');
+  const form = document.getElementById('profileForm');
+  const skillInput = document.getElementById('skillInput');
+  const addSkillBtn = document.getElementById('addSkillBtn');
+  const skillsContainer = document.getElementById('skillsContainer');
+  const consentCheckbox = document.getElementById('consent');
+  const fields = ['position', 'experience', 'education', 'consent'];
+  let editing = false;
+  let skills = Array.from(skillsContainer.querySelectorAll('span')).map(span => span.textContent.trim().replace('×','').trim());
+
+  function setEditing(state) {
+    editing = state;
+    fields.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.disabled = !state;
+    });
+    skillInput.disabled = !state;
+    addSkillBtn.disabled = !state;
+    consentCheckbox.disabled = !state;
+    saveBtn.disabled = !state;
+    saveBtn.classList.toggle('hidden', !state);
+    cancelBtn.classList.toggle('hidden', !state);
+    editBtn.classList.toggle('hidden', state);
+    // Show remove buttons
+    skillsContainer.querySelectorAll('.remove-skill-btn').forEach(btn => {
+      btn.style.display = state ? '' : 'none';
+    });
+  }
+
+  editBtn.addEventListener('click', function() {
+    setEditing(true);
+  });
+  cancelBtn.addEventListener('click', function() {
+    setEditing(false);
+    window.location.reload(); // Reload to reset form
+  });
+
+  // Add skill
+  addSkillBtn.addEventListener('click', function() {
+    const val = skillInput.value.trim();
+    if (val && !skills.includes(val)) {
+      skills.push(val);
+      const span = document.createElement('span');
+      span.className = 'inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800';
+      span.innerHTML = `${val}<button type="button" class="ml-2 text-blue-600 hover:text-blue-800 remove-skill-btn" data-skill="${val}">×</button>`;
+      skillsContainer.appendChild(span);
+      skillInput.value = '';
+      updateRemoveSkillBtns();
+    }
+  });
+  skillInput.addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addSkillBtn.click();
+    }
+  });
+  function updateRemoveSkillBtns() {
+    skillsContainer.querySelectorAll('.remove-skill-btn').forEach(btn => {
+      btn.onclick = function() {
+        const skill = btn.getAttribute('data-skill');
+        skills = skills.filter(s => s !== skill);
+        btn.parentElement.remove();
+      };
+      btn.style.display = editing ? '' : 'none';
+    });
+  }
+  updateRemoveSkillBtns();
+
+  // Enable save button only if consent is checked
+  consentCheckbox.addEventListener('change', function() {
+    saveBtn.disabled = !consentCheckbox.checked;
+  });
+
+  // AJAX form submit
+  form.addEventListener('submit', function(e) {
+    e.preventDefault();
+    if (!editing) return;
+    const data = new FormData(form);
+    data.set('skills', JSON.stringify(skills));
+    fetch(form.action || window.location.href, {
+      method: 'POST',
+      body: data,
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(resp => resp.json())
+    .then(json => {
+      if (json.success) {
+        setEditing(false);
+        window.location.reload();
+      } else {
+        alert(json.error || 'Failed to save profile.');
+      }
+    })
+    .catch(() => alert('Failed to save profile.'));
+  });
+
+  setEditing(false);
+});
+</script>
+{% endblock %} 

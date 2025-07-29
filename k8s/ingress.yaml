@@ -1,0 +1,60 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: pymetrics-ingress
+  namespace: pymetrics
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    nginx.ingress.kubernetes.io/websocket-services: "pymetrics-web-service"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+  labels:
+    app: pymetrics
+spec:
+  tls:
+  - hosts:
+    - pymetrics.example.com
+    secretName: pymetrics-tls
+  rules:
+  - host: pymetrics.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: pymetrics-web-service
+            port:
+              number: 80
+      - path: /ws/
+        pathType: Prefix
+        backend:
+          service:
+            name: pymetrics-web-service
+            port:
+              number: 80
+      - path: /api/
+        pathType: Prefix
+        backend:
+          service:
+            name: pymetrics-web-service
+            port:
+              number: 80
+      - path: /admin/
+        pathType: Prefix
+        backend:
+          service:
+            name: pymetrics-web-service
+            port:
+              number: 80
+      - path: /flower/
+        pathType: Prefix
+        backend:
+          service:
+            name: pymetrics-celery-flower-service
+            port:
+              number: 5555 

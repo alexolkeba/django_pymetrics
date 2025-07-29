@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: pymetrics
+  labels:
+    name: pymetrics
+    app: pymetrics
+    environment: production 

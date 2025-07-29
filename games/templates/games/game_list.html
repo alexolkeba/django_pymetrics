@@ -1,0 +1,260 @@
+{% extends 'base.html' %}
+
+{% block title %}Assessment Games - Rasmetric{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  <div class="mb-8">
+    <h1 class="text-3xl font-bold text-gray-900">Assessment Games</h1>
+    <p class="text-gray-600 mt-2">Complete these games to build your psychometric profile</p>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    {% for game in games %}
+      <div class="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300 flex flex-col h-full">
+        <div class="p-6 flex flex-col h-full">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center">
+              <span class="text-3xl mr-3">{{ game.icon }}</span>
+              <div>
+                <h3 class="text-lg font-semibold text-gray-900">{{ game.name }}</h3>
+                <p class="text-sm text-gray-500">{{ game.description }}</p>
+              </div>
+            </div>
+          </div>
+          <div class="mb-4">
+            <p class="text-sm text-gray-600">{{ game.description }}</p>
+          </div>
+          <div class="flex items-center justify-between mt-auto">
+            <div class="flex flex-col items-start space-y-2 w-full">
+              {% if game.completed %}
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                  <svg class="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                  </svg>
+                  Completed
+                </span>
+                {% if game.score %}
+                  <span class="text-sm text-gray-600">Score: {{ game.score }}</span>
+                {% endif %}
+              {% else %}
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                  Not Started
+                </span>
+              {% endif %}
+              <button
+                {% if not game.completed %}
+                  onclick="startGame('{{ game.type }}')"
+                  class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 mt-2"
+                {% else %}
+                  class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-gray-400 cursor-not-allowed mt-2"
+                  disabled
+                {% endif %}
+              >
+                {% if not game.completed %}
+                  <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1m4 0h1m-6 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Start Game
+                {% else %}
+                  <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                  </svg>
+                  Completed
+                {% endif %}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+
+{{ games|json_script:"game-data" }}
+
+<!-- Game Instructions Modal -->
+<div id="instructionsModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 hidden">
+  <div class="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+    <div class="p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 id="modalTitle" class="text-2xl font-bold text-gray-900"></h2>
+        <button
+          onclick="closeInstructions()"
+          class="text-gray-400 hover:text-gray-600"
+        >
+          <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      
+      <div id="modalContent" class="space-y-4">
+        <!-- Content will be populated by JavaScript -->
+      </div>
+      
+      <div class="flex justify-end space-x-3 mt-6">
+        <button
+          onclick="closeInstructions()"
+          class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md"
+        >
+          Cancel
+        </button>
+        <button
+          id="continueButton"
+          onclick="continueToGame()"
+          class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md"
+        >
+          Continue
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentGameType = null;
+
+function startGame(gameType) {
+  currentGameType = gameType;
+  // Get game data from safely embedded JSON
+  const gameData = JSON.parse(document.getElementById('game-data').textContent);
+  const game = gameData.find(g => g.type === gameType);
+  if (!game) {
+    console.log('Game data not found for type:', gameType);
+    document.getElementById('modalTitle').textContent = 'Game Instructions';
+    document.getElementById('modalContent').innerHTML = '<p class="text-gray-700">Instructions not found. Please follow the on-screen instructions in the game.</p>';
+    document.getElementById('instructionsModal').classList.remove('hidden');
+    return;
+  }
+  // Populate modal
+  document.getElementById('modalTitle').textContent = game.name;
+  const modalContent = document.getElementById('modalContent');
+  modalContent.innerHTML = `
+    <div class="flex items-center mb-4">
+      <span class="text-3xl mr-3">${game.icon}</span>
+      <div>
+        <p class="text-gray-600">${game.description}</p>
+        <p class="text-sm text-gray-500">Measures: ${game.trait || 'Cognitive Ability'}</p>
+      </div>
+    </div>
+    <div class="bg-blue-50 rounded-lg p-6 mb-6">
+      <h3 class="font-semibold text-gray-900 mb-2">Instructions:</h3>
+      <p class="text-gray-700 mb-4">${game.instructions || 'Follow the on-screen instructions to complete this assessment.'}</p>
+      ${getDetailedInstructions(gameType)}
+    </div>
+  `;
+  // Show modal
+  document.getElementById('instructionsModal').classList.remove('hidden');
+}
+
+function getDetailedInstructions(gameType) {
+  const instructions = {
+    'balloon_risk': `<div class="space-y-2 text-sm text-gray-600"><p>• Each balloon has a random burst point</p><p>• The bigger the balloon, the more points you earn</p><p>• But if it bursts, you get no points for that round</p><p>• You'll play 10 rounds total</p></div>`,
+    'letters': `<div class="space-y-2 text-sm text-gray-600"><p>• Identify and submit the correct letter as prompted</p><p>• Letters may be shown in different fonts or cases</p><p>• Respond quickly and accurately</p><p>• This measures verbal reasoning</p></div>`,
+    'reaction_timer': `
+      <div class="space-y-2 text-sm text-gray-600">
+        <p>• Wait for the screen to turn green</p>
+        <p>• Click as fast as possible when it changes</p>
+        <p>• Don't click too early or you'll be penalized</p>
+        <p>• Complete 10 reaction trials</p>
+      </div>
+    `,
+    'sorting_task': `
+      <div class="space-y-2 text-sm text-gray-600">
+        <p>• Objects fall from the top of the screen</p>
+        <p>• Click the correct category button for each object</p>
+        <p>• Speed increases as you progress</p>
+        <p>• Don't let too many objects fall off the screen</p>
+      </div>
+    `,
+    'pattern_completion': `
+      <div class="space-y-2 text-sm text-gray-600">
+        <p>• Study the sequence of numbers carefully</p>
+        <p>• Identify the mathematical pattern</p>
+        <p>• Choose the number that comes next</p>
+        <p>• Patterns may be arithmetic, geometric, or other sequences</p>
+      </div>
+    `,
+    'stroop_test': `
+      <div class="space-y-2 text-sm text-gray-600">
+        <p>• You'll see color words displayed in different colors</p>
+        <p>• Click the button for the COLOR of the text</p>
+        <p>• Ignore what the word actually says</p>
+        <p>• This tests your cognitive flexibility</p>
+      </div>
+    `,
+    'tower_of_hanoi': `
+      <div class="space-y-2 text-sm text-gray-600">
+        <p>• Move all disks from the left tower to the right tower</p>
+        <p>• You can only move one disk at a time</p>
+        <p>• A larger disk cannot be placed on a smaller disk</p>
+        <p>• Use the middle tower as temporary storage</p>
+      </div>
+    `,
+    'emotional_faces': `
+      <div class="space-y-2 text-sm text-gray-600">
+        <p>• Look at each facial expression carefully</p>
+        <p>• Choose the emotion that best matches the expression</p>
+        <p>• Trust your first instinct</p>
+        <p>• There are 6 basic emotions to choose from</p>
+      </div>
+    `,
+    'trust_game': `
+      <div class="space-y-2 text-sm text-gray-600">
+        <p>• You'll be paired with different virtual partners, each with their own personality (generous, stingy, or unpredictable).</p>
+        <p>• Decide how much money to invest with each partner using the slider.</p>
+        <p>• Partners remember your past choices and may change their behavior based on your trust in them.</p>
+        <p>• The game is riskier: you can win big or lose your investment depending on your partner's response.</p>
+        <p>• Watch for visual feedback: profit/loss animations, partner reactions, and helpful messages after each round.</p>
+        <p>• At the end, you'll see an analytics summary of your decisions and outcomes.</p>
+      </div>
+    `,
+    'stop_signal': `
+      <div class="space-y-2 text-sm text-gray-600">
+        <p>• Press the left/right arrow keys when you see an arrow</p>
+        <p>• But if you see a red stop sign, try to stop yourself</p>
+        <p>• The stop signal will appear at different times</p>
+        <p>• This measures your impulse control</p>
+      </div>
+    `,
+    'digit_span': `
+      <div class="space-y-2 text-sm text-gray-600">
+        <p>• Remember the sequence of numbers shown to you</p>
+        <p>• Numbers will be displayed one at a time</p>
+        <p>• Enter the sequence in the correct order</p>
+        <p>• Sequences get longer as you progress</p>
+      </div>
+    `,
+    'fairness_game': `
+      <div class="space-y-2 text-sm text-gray-600">
+        <p>• Distribute money between two people</p>
+        <p>• Choose what you think is fair</p>
+        <p>• Consider factors like effort and contribution</p>
+        <p>• This measures your sense of fairness</p>
+      </div>
+    `,
+    'attention_network': `
+      <div class="space-y-2 text-sm text-gray-600">
+        <p>• Respond to cues and targets as quickly and accurately as possible</p>
+        <p>• Pay attention to both the timing and location of cues</p>
+        <p>• Some trials will be more challenging than others</p>
+        <p>• This measures your alerting, orienting, and executive attention</p>
+      </div>
+    `,
+  };
+  return instructions[gameType] || '';
+}
+
+function closeInstructions() {
+  document.getElementById('instructionsModal').classList.add('hidden');
+  currentGameType = null;
+}
+
+function continueToGame() {
+  if (currentGameType) {
+    window.location.href = `/games/play/${currentGameType}/`;
+  }
+}
+</script>
+{% endblock %}

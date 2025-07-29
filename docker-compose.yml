@@ -1,0 +1,231 @@
+version: '3.8'
+
+services:
+  # Django Web Application
+  web:
+    build:
+      context: .
+      target: production
+    container_name: pymetrics-web
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - DJANGO_SETTINGS_MODULE=pymetric.settings
+      - DATABASE_URL=postgresql://pymetrics:pymetrics@db:5432/pymetrics
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - ./logs:/app/logs
+      - ./media:/app/media
+      - ./ml_models:/app/ml_models
+    networks:
+      - pymetrics-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Development Web Application
+  web-dev:
+    build:
+      context: .
+      target: development
+    container_name: pymetrics-web-dev
+    restart: unless-stopped
+    ports:
+      - "8001:8000"
+    environment:
+      - DJANGO_SETTINGS_MODULE=pymetric.settings
+      - DATABASE_URL=postgresql://pymetrics:pymetrics@db:5432/pymetrics_dev
+      - REDIS_URL=redis://redis:6379/1
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - DEBUG=True
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - .:/app
+      - ./logs:/app/logs
+      - ./media:/app/media
+      - ./ml_models:/app/ml_models
+    networks:
+      - pymetrics-network
+    command: python manage.py runserver 0.0.0.0:8000
+
+  # Celery Worker
+  celery-worker:
+    build:
+      context: .
+      target: production
+    container_name: pymetrics-celery-worker
+    restart: unless-stopped
+    environment:
+      - DJANGO_SETTINGS_MODULE=pymetric.settings
+      - DATABASE_URL=postgresql://pymetrics:pymetrics@db:5432/pymetrics
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - ./logs:/app/logs
+      - ./ml_models:/app/ml_models
+    networks:
+      - pymetrics-network
+    command: celery -A pymetric worker --loglevel=info --concurrency=4
+
+  # Celery Beat Scheduler
+  celery-beat:
+    build:
+      context: .
+      target: production
+    container_name: pymetrics-celery-beat
+    restart: unless-stopped
+    environment:
+      - DJANGO_SETTINGS_MODULE=pymetric.settings
+      - DATABASE_URL=postgresql://pymetrics:pymetrics@db:5432/pymetrics
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - pymetrics-network
+    command: celery -A pymetric beat --loglevel=info
+
+  # Celery Flower (Monitoring)
+  celery-flower:
+    build:
+      context: .
+      target: production
+    container_name: pymetrics-celery-flower
+    restart: unless-stopped
+    ports:
+      - "5555:5555"
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      - redis
+    networks:
+      - pymetrics-network
+    command: celery -A pymetric flower --port=5555
+
+  # PostgreSQL Database
+  db:
+    image: postgres:15-alpine
+    container_name: pymetrics-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=pymetrics
+      - POSTGRES_USER=pymetrics
+      - POSTGRES_PASSWORD=pymetrics
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - pymetrics-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pymetrics -d pymetrics"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache and Message Broker
+  redis:
+    image: redis:7-alpine
+    container_name: pymetrics-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass redis_password
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - pymetrics-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: pymetrics-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/ssl:/etc/nginx/ssl
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+    depends_on:
+      - web
+    networks:
+      - pymetrics-network
+
+  # Monitoring Stack
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: pymetrics-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - pymetrics-network
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: pymetrics-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+    depends_on:
+      - prometheus
+    networks:
+      - pymetrics-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  static_volume:
+  media_volume:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  pymetrics-network:
+    driver: bridge 

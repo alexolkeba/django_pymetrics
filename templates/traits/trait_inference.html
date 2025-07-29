@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>Trait Inference</h2>
+<form id="trait-inference-form">
+    <label for="session_id">Session ID:</label>
+    <input type="text" id="session_id" name="session_id" required>
+    <button type="submit">Infer Traits</button>
+</form>
+<div id="trait-results"></div>
+<script>
+document.getElementById('trait-inference-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const sessionId = document.getElementById('session_id').value;
+    const response = await fetch('/api/traits/trait-profiles/infer/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ session_id: sessionId })
+    });
+    const data = await response.json();
+    const resultsDiv = document.getElementById('trait-results');
+    if (response.ok) {
+        resultsDiv.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+    } else {
+        resultsDiv.innerHTML = `<span style='color:red;'>${data.error}</span>`;
+    }
+});
+</script>
+{% endblock %}

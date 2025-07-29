@@ -1,0 +1,162 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="max-w-lg mx-auto mt-4">
+    <button id="back-to-games" class="inline-block mb-4 px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300">← Back to Games</button>
+</div>
+<div class="game-container max-w-lg mx-auto mt-8 p-6 bg-white rounded shadow">
+    <h2 class="text-2xl font-bold mb-2">Attention Network Game</h2>
+    <p class="mb-4">Respond to cues and targets as quickly and accurately as possible. Try to maximize your score over <span id="total-rounds">12</span> trials.</p>
+    <div id="game-area">
+        <div id="round-info" class="mb-2 font-semibold">Trial <span id="round-num">1</span> of <span id="total-rounds-2">12</span></div>
+        <div class="mb-2">Current score: <span id="score">0</span></div>
+        <div id="cue" class="my-4 text-xl"></div>
+        <div id="target" class="my-4 text-3xl"></div>
+        <div class="flex space-x-2 mb-2">
+            <button class="attn-btn bg-blue-500 text-white px-4 py-2 rounded" data-choice="left">Left</button>
+            <button class="attn-btn bg-green-500 text-white px-4 py-2 rounded" data-choice="right">Right</button>
+        </div>
+        <div id="feedback" class="mt-3 text-blue-600 font-semibold"></div>
+    </div>
+
+</div>
+<script>
+const TOTAL_ROUNDS = 12;
+let currentRound = 1;
+let score = 0;
+let events = [];
+let difficulty = 'medium';
+let cueType = '';
+let targetDir = '';
+let trialStart = null;
+
+function randomCue() {
+    // Types: 'center', 'double', 'spatial-left', 'spatial-right', 'none'
+    const cues = ['center', 'double', 'spatial-left', 'spatial-right', 'none'];
+    return cues[Math.floor(Math.random() * cues.length)];
+}
+function randomTarget() {
+    return Math.random() < 0.5 ? 'left' : 'right';
+}
+function showTrial() {
+    cueType = randomCue();
+    targetDir = randomTarget();
+    let cueText = '';
+    if (cueType === 'center') cueText = '●';
+    else if (cueType === 'double') cueText = '●   ●';
+    else if (cueType === 'spatial-left') cueText = '●      ';
+    else if (cueType === 'spatial-right') cueText = '      ●';
+    else cueText = '';
+    document.getElementById('cue').textContent = cueText;
+    document.getElementById('target').textContent = '';
+    setTimeout(() => {
+        document.getElementById('target').textContent = targetDir === 'left' ? '←' : '→';
+        trialStart = Date.now();
+    }, 700); // Cue duration
+}
+function logEvent(type, data) {
+    events.push({
+        event_type: type,
+        trial: currentRound,
+        cue: cueType,
+        target: targetDir,
+        score: score,
+        difficulty: difficulty,
+        timestamp: Date.now(),
+        ...data
+    });
+}
+function updateUI() {
+    document.getElementById('round-num').textContent = currentRound;
+    document.getElementById('total-rounds').textContent = TOTAL_ROUNDS;
+    document.getElementById('total-rounds-2').textContent = TOTAL_ROUNDS;
+    document.getElementById('score').textContent = score;
+    document.getElementById('feedback').textContent = '';
+    showTrial();
+}
+document.querySelectorAll('.attn-btn').forEach(btn => {
+    btn.onclick = function() {
+        if (!trialStart) return;
+        const choice = btn.getAttribute('data-choice');
+        const rt = Date.now() - trialStart;
+        const correct = choice === targetDir;
+        logEvent('response', {choice: choice, correct: correct, reaction_time: rt});
+        if (correct) {
+            score += 1;
+            document.getElementById('feedback').textContent = `Correct! (+1)`;
+        } else {
+            document.getElementById('feedback').textContent = `Incorrect.`;
+        }
+        trialStart = null;
+        if (currentRound < TOTAL_ROUNDS) {
+            currentRound++;
+            setTimeout(() => {
+                updateUI();
+            }, 900);
+        } else {
+            document.getElementById('game-area').innerHTML = `<div class='font-bold text-lg'>Game Over! Final score: ${score}</div>`;
+            logEvent('end', {final_score: score});
+            sendEventsToBackend();
+        }
+    };
+});
+document.getElementById('back-to-games').onclick = function() {
+    // If game is still active, end session first
+    if (currentRound <= TOTAL_ROUNDS) {
+        logEvent('manual_end', {final_score: score});
+        document.querySelectorAll('.attn-btn').forEach(btn => btn.disabled = true);
+        document.getElementById('game-area').innerHTML = `<div class='font-bold text-lg text-red-600'>Session Ended! Final score: ${score}</div>`;
+        // Save data and then redirect
+        sendEventsToBackend().then(() => {
+            window.location.href = '/games/';
+        }).catch(() => {
+            // Even if save fails, still redirect
+            window.location.href = '/games/';
+        });
+    } else {
+        // Game is already completed, just redirect
+        window.location.href = '/games/';
+    }
+};
+function sendEventsToBackend() {
+    return fetch('/games/save_game_result/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({
+            game_type: 'attention_network',
+            score: score,
+            duration: TOTAL_ROUNDS * 5, // Placeholder
+            decisions: events.filter(e => e.event_type === 'response'),
+            reaction_times: events.filter(e => e.reaction_time !== undefined).map(e => e.reaction_time),
+            raw_data: {events: events}
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            console.log('Session saved successfully');
+        } else {
+            console.error('Error saving session: ' + data.error);
+        }
+        return data;
+    });
+}
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+updateUI();
+</script>
+{% endblock %}

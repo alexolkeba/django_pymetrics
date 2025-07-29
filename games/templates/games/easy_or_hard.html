@@ -1,0 +1,141 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="max-w-lg mx-auto mt-4">
+    <button id="back-to-games" class="inline-block mb-4 px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300">← Back to Games</button>
+</div>
+<div class="game-container max-w-lg mx-auto mt-8 p-6 bg-white rounded shadow">
+    <h2 class="text-2xl font-bold mb-2">Easy or Hard Game</h2>
+    <p class="mb-4">Choose between an easy or hard task each round. Hard tasks give more points but are more difficult. Try to maximize your score over <span id="total-rounds">5</span> rounds.</p>
+    <div id="game-area">
+        <div id="round-info" class="mb-2 font-semibold">Round <span id="round-num">1</span> of <span id="total-rounds-2">5</span></div>
+        <div class="mb-2">Current score: <span id="score">0</span></div>
+        <button id="easy-btn" class="bg-green-500 text-white px-4 py-2 rounded mr-2">Easy Task (+1)</button>
+        <button id="hard-btn" class="bg-red-500 text-white px-4 py-2 rounded">Hard Task (+3)</button>
+        <div id="feedback" class="mt-3 text-blue-600 font-semibold"></div>
+    </div>
+
+</div>
+<script>
+const TOTAL_ROUNDS = 5;
+let currentRound = 1;
+let score = 0;
+let events = [];
+let difficulty = 'medium';
+
+function logEvent(type, data) {
+    events.push({
+        event_type: type,
+        round: currentRound,
+        score: score,
+        difficulty: difficulty,
+        timestamp: Date.now(),
+        ...data
+    });
+}
+
+function updateUI() {
+    document.getElementById('round-num').textContent = currentRound;
+    document.getElementById('total-rounds').textContent = TOTAL_ROUNDS;
+    document.getElementById('total-rounds-2').textContent = TOTAL_ROUNDS;
+    document.getElementById('score').textContent = score;
+    document.getElementById('feedback').textContent = '';
+}
+
+document.getElementById('easy-btn').onclick = function() {
+    logEvent('choose_easy', {});
+    score += 1;
+    document.getElementById('feedback').textContent = 'You chose the easy task (+1).';
+    nextRound();
+};
+
+document.getElementById('hard-btn').onclick = function() {
+    // Simulate success/failure based on difficulty
+    const success = Math.random() < (difficulty === 'easy' ? 0.9 : difficulty === 'hard' ? 0.5 : 0.7);
+    logEvent('choose_hard', {success: success});
+    if (success) {
+        score += 3;
+        document.getElementById('feedback').textContent = 'You succeeded at the hard task (+3)!';
+    } else {
+        document.getElementById('feedback').textContent = 'You failed the hard task (0 points).';
+    }
+    nextRound();
+};
+
+function nextRound() {
+    if (currentRound < TOTAL_ROUNDS) {
+        currentRound++;
+        setTimeout(() => {
+            updateUI();
+        }, 1000);
+    } else {
+        document.getElementById('game-area').innerHTML = `<div class='font-bold text-lg'>Game Over! Final score: ${score}</div>`;
+        logEvent('end', {final_score: score});
+        sendEventsToBackend();
+    }
+}
+
+document.getElementById('back-to-games').onclick = function() {
+    // If game is still active, end session first
+    if (currentRound <= TOTAL_ROUNDS) {
+        logEvent('manual_end', {final_score: score});
+        document.getElementById('easy-btn').disabled = true;
+        document.getElementById('hard-btn').disabled = true;
+        document.getElementById('game-area').innerHTML = `<div class='font-bold text-lg text-red-600'>Session Ended! Final score: ${score}</div>`;
+        // Save data and then redirect
+        sendEventsToBackend().then(() => {
+            window.location.href = '/games/';
+        }).catch(() => {
+            // Even if save fails, still redirect
+            window.location.href = '/games/';
+        });
+    } else {
+        // Game is already completed, just redirect
+        window.location.href = '/games/';
+    }
+};
+
+function sendEventsToBackend() {
+    return fetch('/games/save_game_result/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({
+            game_type: 'easy_or_hard',
+            score: score,
+            duration: TOTAL_ROUNDS * 10,
+            decisions: events.filter(e => e.event_type.startsWith('choose_')),
+            reaction_times: [],
+            raw_data: {events: events}
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            console.log('Session saved successfully');
+        } else {
+            console.error('Error saving session: ' + data.error);
+        }
+        return data;
+    });
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+updateUI();
+</script>
+{% endblock %}

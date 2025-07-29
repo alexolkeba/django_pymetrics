@@ -1,0 +1,146 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="max-w-lg mx-auto mt-4">
+    <button id="back-to-games" class="inline-block mb-4 px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300">← Back to Games</button>
+</div>
+<div class="game-container max-w-lg mx-auto mt-8 p-6 bg-white rounded shadow">
+    <h2 class="text-2xl font-bold mb-2">Cards Game (Iowa Gambling)</h2>
+    <p class="mb-4">Pick cards from four decks (A, B, C, D). Some decks are riskier but may offer higher rewards. Try to maximize your total score over <span id="total-rounds">20</span> picks.</p>
+    <div id="game-area">
+        <div id="round-info" class="mb-2 font-semibold">Pick <span id="round-num">1</span> of <span id="total-rounds-2">20</span></div>
+        <div class="mb-2">Current score: <span id="score">0</span></div>
+        <div class="flex space-x-2 mb-2">
+            <button class="deck-btn bg-blue-500 text-white px-4 py-2 rounded" data-deck="A">Deck A</button>
+            <button class="deck-btn bg-green-500 text-white px-4 py-2 rounded" data-deck="B">Deck B</button>
+            <button class="deck-btn bg-yellow-500 text-white px-4 py-2 rounded" data-deck="C">Deck C</button>
+            <button class="deck-btn bg-red-500 text-white px-4 py-2 rounded" data-deck="D">Deck D</button>
+        </div>
+        <div id="feedback" class="mt-3 text-blue-600 font-semibold"></div>
+    </div>
+
+</div>
+<script>
+const TOTAL_ROUNDS = 20;
+let currentRound = 1;
+let score = 0;
+let events = [];
+let difficulty = 'medium';
+
+// Deck reward/punishment structure (simplified)
+const decks = {
+    'A': {reward: 100, penalty: 250, penaltyChance: 0.5},
+    'B': {reward: 100, penalty: 1250, penaltyChance: 0.1},
+    'C': {reward: 50, penalty: 50, penaltyChance: 0.1},
+    'D': {reward: 50, penalty: 250, penaltyChance: 0.1}
+};
+
+function logEvent(type, data) {
+    events.push({
+        event_type: type,
+        pick: currentRound,
+        score: score,
+        difficulty: difficulty,
+        timestamp: Date.now(),
+        ...data
+    });
+}
+
+function updateUI() {
+    document.getElementById('round-num').textContent = currentRound;
+    document.getElementById('total-rounds').textContent = TOTAL_ROUNDS;
+    document.getElementById('total-rounds-2').textContent = TOTAL_ROUNDS;
+    document.getElementById('score').textContent = score;
+    document.getElementById('feedback').textContent = '';
+}
+
+document.querySelectorAll('.deck-btn').forEach(btn => {
+    btn.onclick = function() {
+        const deck = btn.getAttribute('data-deck');
+        const deckInfo = decks[deck];
+        let reward = deckInfo.reward;
+        let penalty = 0;
+        let gotPenalty = false;
+        if (Math.random() < deckInfo.penaltyChance) {
+            penalty = deckInfo.penalty;
+            gotPenalty = true;
+        }
+        score += reward - penalty;
+        logEvent('pick', {deck: deck, reward: reward, penalty: penalty, gotPenalty: gotPenalty});
+        document.getElementById('feedback').textContent = `You picked Deck ${deck}: +$${reward}` + (gotPenalty ? `, -$${penalty}` : '');
+        if (currentRound < TOTAL_ROUNDS) {
+            currentRound++;
+            setTimeout(() => {
+                updateUI();
+            }, 1000);
+        } else {
+            document.getElementById('game-area').innerHTML = `<div class='font-bold text-lg'>Game Over! Final score: $${score}</div>`;
+            logEvent('end', {final_score: score});
+            sendEventsToBackend();
+        }
+    };
+});
+
+document.getElementById('back-to-games').onclick = function() {
+    // If game is still active, end session first
+    if (currentRound <= TOTAL_ROUNDS) {
+        logEvent('manual_end', {final_score: score});
+        document.querySelectorAll('.deck-btn').forEach(btn => btn.disabled = true);
+        document.getElementById('game-area').innerHTML = `<div class='font-bold text-lg text-red-600'>Session Ended! Final score: $${score}</div>`;
+        // Save data and then redirect
+        sendEventsToBackend().then(() => {
+            window.location.href = '/games/';
+        }).catch(() => {
+            // Even if save fails, still redirect
+            window.location.href = '/games/';
+        });
+    } else {
+        // Game is already completed, just redirect
+        window.location.href = '/games/';
+    }
+};
+
+function sendEventsToBackend() {
+    return fetch('/games/save_game_result/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({
+            game_type: 'cards_game',
+            score: score,
+            duration: TOTAL_ROUNDS * 10,
+            decisions: events.filter(e => e.event_type === 'pick'),
+            reaction_times: [],
+            raw_data: {events: events}
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            console.log('Session saved successfully');
+        } else {
+            console.error('Error saving session: ' + data.error);
+        }
+        return data;
+    });
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+updateUI();
+</script>
+{% endblock %}

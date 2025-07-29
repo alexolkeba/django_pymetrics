@@ -1,0 +1,226 @@
+{% extends 'base.html' %}
+
+{% block title %}Pattern Completion Game - Rasmetric{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50">
+  <div class="max-w-4xl mx-auto px-4 py-8">
+    <button
+      onclick="window.location.href='{% url 'game_list' %}'"
+      class="flex items-center text-gray-600 hover:text-gray-900 mb-6"
+    >
+      <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+      </svg>
+      Back to Games
+    </button>
+
+    <div id="gameContainer" class="text-center">
+      <h2 class="text-2xl font-bold text-gray-900 mb-4">Pattern Completion</h2>
+      <div class="bg-white rounded-lg shadow-sm p-8 mb-6">
+        <div class="flex justify-between items-center mb-6">
+          <div>
+            <p class="text-sm text-gray-600">Round: <span id="roundDisplay">1</span>/10</p>
+            <p class="text-sm text-gray-600">Score: <span id="scoreDisplay">0</span></p>
+          </div>
+        </div>
+        <div id="patternContainer" class="mb-8"></div>
+        <div id="feedbackContainer" class="mb-4"></div>
+        <div id="optionsContainer" class="grid grid-cols-2 gap-4 max-w-md mx-auto"></div>
+      </div>
+    </div>
+
+    <div id="gameOverContainer" class="text-center hidden">
+      <h2 class="text-2xl font-bold text-gray-900 mb-4">Game Complete!</h2>
+      <div class="bg-blue-50 rounded-lg p-6 mb-6">
+        <p class="text-lg text-gray-700 mb-2">Final Score: <span id="finalScore" class="font-bold text-blue-600">0</span></p>
+        <p class="text-lg text-gray-700 mb-2">Correct Answers: <span id="finalCorrect" class="font-bold text-green-600">0</span>/10</p>
+        <p class="text-sm text-gray-600">Accuracy: <span id="finalAccuracy">0</span>%</p>
+      </div>
+      <button
+        onclick="window.location.href='{% url 'game_list' %}'"
+        class="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700"
+      >
+        Continue
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+let round = 1;
+const totalRounds = 10;
+let score = 0;
+let currentPattern = null;
+let gameOver = false;
+let startTime = Date.now();
+let roundStartTime = Date.now();
+let decisions = [];
+let reactionTimes = [];
+let feedback = null;
+
+function generatePattern() {
+  const patterns = [
+    // Arithmetic
+    () => {
+      const start = Math.floor(Math.random() * 10) + 1;
+      const diff = Math.floor(Math.random() * 5) + 1;
+      const sequence = [start, start + diff, start + 2 * diff, start + 3 * diff];
+      return { sequence, answer: start + 4 * diff };
+    },
+    // Geometric
+    () => {
+      const start = Math.floor(Math.random() * 3) + 2;
+      const ratio = Math.floor(Math.random() * 3) + 2;
+      const sequence = [start, start * ratio, start * ratio * ratio, start * ratio * ratio * ratio];
+      return { sequence, answer: start * Math.pow(ratio, 4) };
+    },
+    // Fibonacci-like
+    () => {
+      const a = Math.floor(Math.random() * 5) + 1;
+      const b = Math.floor(Math.random() * 5) + 1;
+      const sequence = [a, b, a + b, a + 2 * b];
+      return { sequence, answer: 2 * a + 3 * b };
+    },
+    // Square
+    () => {
+      const start = Math.floor(Math.random() * 5) + 1;
+      const sequence = [start * start, (start + 1) * (start + 1), (start + 2) * (start + 2), (start + 3) * (start + 3)];
+      return { sequence, answer: (start + 4) * (start + 4) };
+    }
+  ];
+  const patternGenerator = patterns[Math.floor(Math.random() * patterns.length)];
+  const { sequence, answer } = patternGenerator();
+  const options = [answer];
+  while (options.length < 4) {
+    const wrong = answer + Math.floor(Math.random() * 20) - 10;
+    if (wrong !== answer && !options.includes(wrong) && wrong > 0) {
+      options.push(wrong);
+    }
+  }
+  const shuffledOptions = options.sort(() => Math.random() - 0.5);
+  currentPattern = { sequence, answer, options: shuffledOptions };
+  roundStartTime = Date.now();
+  feedback = null;
+  renderPattern();
+  renderOptions();
+  renderFeedback();
+}
+
+function renderPattern() {
+  const patternContainer = document.getElementById('patternContainer');
+  patternContainer.innerHTML = `<p class="text-lg text-gray-700 mb-4">Find the next number in the sequence:</p>
+    <div class="flex items-center justify-center space-x-4 mb-6">
+      ${currentPattern.sequence.map(num => `<div class=\"bg-blue-100 rounded-lg p-4 text-xl font-bold text-blue-800\">${num}</div>`).join('')}
+      <div class="bg-gray-200 rounded-lg p-4 text-xl font-bold text-gray-600">?</div>
+    </div>`;
+}
+
+function renderOptions() {
+  const optionsContainer = document.getElementById('optionsContainer');
+  optionsContainer.innerHTML = '';
+  if (!feedback) {
+    currentPattern.options.forEach(option => {
+      const btn = document.createElement('button');
+      btn.className = 'bg-gray-100 hover:bg-gray-200 border-2 border-gray-300 rounded-lg p-4 text-lg font-bold text-gray-800 transition-colors';
+      btn.textContent = option;
+      btn.onclick = () => handleAnswer(option);
+      optionsContainer.appendChild(btn);
+    });
+  }
+}
+
+function renderFeedback() {
+  const feedbackContainer = document.getElementById('feedbackContainer');
+  if (feedback) {
+    feedbackContainer.innerHTML = `<div class="mb-4 p-3 rounded-lg text-lg font-semibold ${feedback.includes('Correct') ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">${feedback}</div>`;
+  } else {
+    feedbackContainer.innerHTML = '';
+  }
+}
+
+function handleAnswer(selectedAnswer) {
+  const reactionTime = Date.now() - roundStartTime;
+  reactionTimes.push(reactionTime);
+  const isCorrect = selectedAnswer === currentPattern.answer;
+  decisions.push({
+    round,
+    sequence: currentPattern.sequence,
+    selectedAnswer,
+    correctAnswer: currentPattern.answer,
+    correct: isCorrect,
+    reactionTime
+  });
+  if (isCorrect) {
+    score += 10;
+    feedback = 'Correct! \u2713';
+  } else {
+    feedback = `Wrong! The answer was ${currentPattern.answer}`;
+  }
+  renderFeedback();
+  renderOptions();
+  setTimeout(() => {
+    if (round < totalRounds) {
+      round++;
+      document.getElementById('roundDisplay').textContent = round;
+      document.getElementById('scoreDisplay').textContent = score;
+      generatePattern();
+    } else {
+      endGame();
+    }
+  }, 1500);
+}
+
+function endGame() {
+  gameOver = true;
+  const totalTime = Date.now() - startTime;
+  const correctAnswers = decisions.filter(d => d.correct).length;
+  const accuracy = correctAnswers / totalRounds;
+  document.getElementById('gameContainer').classList.add('hidden');
+  document.getElementById('gameOverContainer').classList.remove('hidden');
+  document.getElementById('finalScore').textContent = Math.min(score, 100);
+  document.getElementById('finalCorrect').textContent = correctAnswers;
+  document.getElementById('finalAccuracy').textContent = Math.round(accuracy * 100);
+  saveGameResult(totalTime, accuracy, correctAnswers);
+}
+
+function saveGameResult(totalTime, accuracy, correctAnswers) {
+  const gameData = {
+    game_type: 'pattern_completion',
+    score: Math.min(score, 100),
+    duration: totalTime,
+    decisions: decisions,
+    reaction_times: reactionTimes,
+    raw_data: {
+      finalScore: score,
+      accuracy: accuracy,
+      averageReactionTime: reactionTimes.reduce((a, b) => a + b, 0) / (reactionTimes.length || 1),
+      correctAnswers: correctAnswers
+    }
+  };
+  fetch('{% url "games:save_game_result" %}', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+    },
+    body: JSON.stringify(gameData)
+  })
+  .then(response => response.json())
+  .then(data => {
+    console.log('Game result saved:', data);
+  })
+  .catch(error => {
+    console.error('Error saving game result:', error);
+  });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  document.getElementById('roundDisplay').textContent = round;
+  document.getElementById('scoreDisplay').textContent = score;
+  generatePattern();
+});
+</script>
+
+{% csrf_token %}
+{% endblock %} 

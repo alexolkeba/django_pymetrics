@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>Balloon Risk Game</h2>
+<div id="balloon-game">
+    <p>Balloon Size: <span id="balloon-size">1.0</span></p>
+    <button id="pump-btn">Pump Balloon</button>
+    <button id="collect-btn">Collect Earnings</button>
+    <p>Earnings: <span id="earnings">0.00</span></p>
+    <p>Total Earnings: <span id="total-earnings">0.00</span></p>
+    <p id="status"></p>
+</div>
+<script>
+let balloonSize = 1.0;
+let earnings = 0.00;
+let totalEarnings = 0.00;
+let pumpNumber = 0;
+const sessionId = 'session_' + Date.now();
+
+function logEvent(eventType, eventData) {
+    fetch('/api/behavioral/events/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            session_id: sessionId,
+            event_type: eventType,
+            event_data: eventData
+        })
+    });
+}
+
+document.getElementById('pump-btn').onclick = function() {
+    balloonSize += 0.2;
+    pumpNumber += 1;
+    earnings += 0.05;
+    document.getElementById('balloon-size').textContent = balloonSize.toFixed(2);
+    document.getElementById('earnings').textContent = earnings.toFixed(2);
+    logEvent('balloon_risk', {
+        balloon_id: 'balloon_1',
+        pump_number: pumpNumber,
+        timestamp_milliseconds: Date.now(),
+        balloon_size: balloonSize,
+        current_earnings: earnings,
+        total_earnings: totalEarnings,
+        time_since_prev_pump: 1000,
+        is_new_personal_max: false,
+        is_rapid_pump: false
+    });
+    document.getElementById('status').textContent = 'Balloon pumped!';
+};
+
+document.getElementById('collect-btn').onclick = function() {
+    totalEarnings += earnings;
+    earnings = 0.00;
+    balloonSize = 1.0;
+    pumpNumber = 0;
+    document.getElementById('balloon-size').textContent = balloonSize.toFixed(2);
+    document.getElementById('earnings').textContent = earnings.toFixed(2);
+    document.getElementById('total-earnings').textContent = totalEarnings.toFixed(2);
+    document.getElementById('status').textContent = 'Earnings collected!';
+};
+</script>
+{% endblock %}

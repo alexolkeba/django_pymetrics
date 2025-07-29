@@ -1,0 +1,209 @@
+{% extends 'base.html' %}
+
+{% block title %}Stroop Test Game - Rasmetric{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50">
+  <div class="max-w-4xl mx-auto px-4 py-8">
+    <button
+      onclick="window.location.href='{% url 'games:game_list' %}'"
+      class="flex items-center text-gray-600 hover:text-gray-900 mb-6"
+    >
+      <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+      </svg>
+      Back to Games
+    </button>
+
+    <div id="gameContainer" class="text-center">
+      <h2 class="text-2xl font-bold text-gray-900 mb-4">Stroop Test</h2>
+      <div class="bg-white rounded-lg shadow-sm p-8 mb-6">
+        <div class="flex justify-between items-center mb-6">
+          <div>
+            <p class="text-sm text-gray-600">Round: <span id="roundDisplay">1</span>/20</p>
+            <p class="text-sm text-gray-600">Score: <span id="scoreDisplay">0</span></p>
+          </div>
+        </div>
+        <div id="stroopArea"></div>
+      </div>
+    </div>
+
+    <div id="gameOverContainer" class="text-center hidden">
+      <h2 class="text-2xl font-bold text-gray-900 mb-4">Game Complete!</h2>
+      <div class="bg-blue-50 rounded-lg p-6 mb-6">
+        <p class="text-lg text-gray-700 mb-2">Final Score: <span id="finalScore" class="font-bold text-blue-600">0</span></p>
+        <p class="text-lg text-gray-700 mb-2">Correct Answers: <span id="finalCorrect" class="font-bold text-green-600">0</span>/20</p>
+        <p class="text-sm text-gray-600">Accuracy: <span id="finalAccuracy">0</span>%</p>
+      </div>
+      <button
+        onclick="window.location.href='{% url 'games:game_list' %}'"
+        class="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700"
+      >
+        Continue
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+const totalRounds = 20;
+const colors = ['red', 'blue', 'green', 'yellow', 'purple', 'orange'];
+const colorWords = ['red', 'blue', 'green', 'yellow', 'purple', 'orange'];
+let round = 1;
+let score = 0;
+let gameOver = false;
+let startTime = Date.now();
+let roundStartTime = Date.now();
+let decisions = [];
+let reactionTimes = [];
+let feedback = null;
+let currentItem = null;
+
+function getColorClass(color) {
+  const colorMap = {
+    red: 'text-red-500',
+    blue: 'text-blue-500',
+    green: 'text-green-500',
+    yellow: 'text-yellow-500',
+    purple: 'text-purple-500',
+    orange: 'text-orange-500'
+  };
+  return colorMap[color] || 'text-gray-500';
+}
+function getButtonClass(color) {
+  const colorMap = {
+    red: 'bg-red-500 hover:bg-red-600',
+    blue: 'bg-blue-500 hover:bg-blue-600',
+    green: 'bg-green-500 hover:bg-green-600',
+    yellow: 'bg-yellow-500 hover:bg-yellow-600',
+    purple: 'bg-purple-500 hover:bg-purple-600',
+    orange: 'bg-orange-500 hover:bg-orange-600'
+  };
+  return colorMap[color] || 'bg-gray-500 hover:bg-gray-600';
+}
+function generateStroopItem() {
+  const word = colorWords[Math.floor(Math.random() * colorWords.length)];
+  const color = colors[Math.floor(Math.random() * colors.length)];
+  const isCongruent = word === color;
+  currentItem = { word, color, isCongruent };
+  roundStartTime = Date.now();
+  feedback = null;
+  renderStroopArea();
+}
+function handleColorClick(selectedColor) {
+  const reactionTime = Date.now() - roundStartTime;
+  reactionTimes.push(reactionTime);
+  const isCorrect = selectedColor === currentItem.color;
+  decisions.push({
+    round: round,
+    word: currentItem.word,
+    color: currentItem.color,
+    selectedColor: selectedColor,
+    correct: isCorrect,
+    congruent: currentItem.isCongruent,
+    reactionTime: reactionTime
+  });
+  if (isCorrect) {
+    score += 5;
+    feedback = 'Correct! ✓';
+  } else {
+    feedback = `Wrong! The color was ${currentItem.color}`;
+  }
+  renderStroopArea();
+  setTimeout(() => {
+    if (round < totalRounds) {
+      round++;
+      document.getElementById('roundDisplay').textContent = round;
+      document.getElementById('scoreDisplay').textContent = score;
+      generateStroopItem();
+    } else {
+      endGame();
+    }
+  }, 800);
+}
+function renderStroopArea() {
+  const area = document.getElementById('stroopArea');
+  area.innerHTML = '';
+  if (!currentItem) return;
+  const prompt = document.createElement('p');
+  prompt.className = 'text-lg text-gray-700 mb-4';
+  prompt.textContent = 'Click the color of the word (not what it says):';
+  area.appendChild(prompt);
+  const wordDiv = document.createElement('div');
+  wordDiv.className = `mb-8 text-6xl font-bold ${getColorClass(currentItem.color)}`;
+  wordDiv.textContent = currentItem.word.toUpperCase();
+  area.appendChild(wordDiv);
+  if (feedback) {
+    const feedbackDiv = document.createElement('div');
+    feedbackDiv.className = `mb-4 p-3 rounded-lg text-lg font-semibold ${feedback.includes('Correct') ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`;
+    feedbackDiv.textContent = feedback;
+    area.appendChild(feedbackDiv);
+  } else {
+    const grid = document.createElement('div');
+    grid.className = 'grid grid-cols-3 gap-4 max-w-lg mx-auto';
+    colors.forEach(color => {
+      const btn = document.createElement('button');
+      btn.className = `${getButtonClass(color)} text-white px-6 py-3 rounded-lg font-semibold transition-colors`;
+      btn.textContent = color.toUpperCase();
+      btn.onclick = () => handleColorClick(color);
+      grid.appendChild(btn);
+    });
+    area.appendChild(grid);
+  }
+}
+function endGame() {
+  gameOver = true;
+  document.getElementById('gameContainer').classList.add('hidden');
+  document.getElementById('gameOverContainer').classList.remove('hidden');
+  document.getElementById('finalScore').textContent = score;
+  const correct = decisions.filter(d => d.correct).length;
+  document.getElementById('finalCorrect').textContent = correct;
+  document.getElementById('finalAccuracy').textContent = Math.round((correct / totalRounds) * 100);
+  saveGameResult();
+}
+function saveGameResult() {
+  const totalTime = Date.now() - startTime;
+  const accuracy = decisions.filter(d => d.correct).length / decisions.length;
+  const congruentItems = decisions.filter(d => d.congruent);
+  const incongruentItems = decisions.filter(d => !d.congruent);
+  const gameData = {
+    game_type: 'stroop_test',
+    score: Math.min(score, 100),
+    duration: totalTime,
+    decisions: decisions,
+    reaction_times: reactionTimes,
+    raw_data: {
+      finalScore: score,
+      accuracy: accuracy,
+      averageReactionTime: reactionTimes.length ? reactionTimes.reduce((a, b) => a + b, 0) / reactionTimes.length : 0,
+      congruentAccuracy: congruentItems.length > 0 ? congruentItems.filter(d => d.correct).length / congruentItems.length : 0,
+      incongruentAccuracy: incongruentItems.length > 0 ? incongruentItems.filter(d => d.correct).length / incongruentItems.length : 0,
+      stroopInterference: (congruentItems.length ? congruentItems.reduce((sum, d) => sum + d.reactionTime, 0) / congruentItems.length : 0) -
+                         (incongruentItems.length ? incongruentItems.reduce((sum, d) => sum + d.reactionTime, 0) / incongruentItems.length : 0)
+    }
+  };
+  fetch('{% url "games:save_game_result" %}', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+    },
+    body: JSON.stringify(gameData)
+  })
+  .then(response => response.json())
+  .then(data => {
+    console.log('Game result saved:', data);
+  })
+  .catch(error => {
+    console.error('Error saving game result:', error);
+  });
+}
+document.addEventListener('DOMContentLoaded', function() {
+  generateStroopItem();
+  document.getElementById('roundDisplay').textContent = round;
+  document.getElementById('scoreDisplay').textContent = score;
+});
+</script>
+
+{% csrf_token %}
+{% endblock %} 

@@ -1,0 +1,147 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="max-w-lg mx-auto mt-4">
+    <button id="back-to-games" class="inline-block mb-4 px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300">← Back to Games</button>
+</div>
+<div class="game-container max-w-lg mx-auto mt-8 p-6 bg-white rounded shadow">
+    <h2 class="text-2xl font-bold mb-2">Letters Game</h2>
+    <p class="mb-4">Type the letter shown as quickly and accurately as possible. Try to maximize your score over <span id="total-rounds">10</span> rounds.</p>
+    <div id="game-area">
+        <div id="round-info" class="mb-2 font-semibold">Round <span id="round-num">1</span> of <span id="total-rounds-2">10</span></div>
+        <div class="mb-2">Target letter: <span id="target-letter" class="font-mono text-lg"></span></div>
+        <label for="letter-input" class="block mb-1">Enter the letter:</label>
+        <input type="text" id="letter-input" maxlength="1" class="border rounded px-2 py-1 mb-2 w-full" autocomplete="off" />
+        <button id="submit-letter" class="bg-blue-500 text-white px-4 py-2 rounded">Submit</button>
+        <div id="feedback" class="mt-3 text-green-600 font-semibold"></div>
+    </div>
+
+</div>
+<script>
+const TOTAL_ROUNDS = 10;
+let currentRound = 1;
+let score = 0;
+let events = [];
+let startTime = null;
+let targetLetter = '';
+let difficulty = 'medium'; // Placeholder for dynamic difficulty
+
+function getRandomLetter() {
+    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    return letters[Math.floor(Math.random() * letters.length)];
+}
+
+function logEvent(type, data) {
+    events.push({
+        event_type: type,
+        round: currentRound,
+        target: targetLetter,
+        difficulty: difficulty,
+        timestamp: Date.now(),
+        ...data
+    });
+}
+
+function updateUI() {
+    document.getElementById('round-num').textContent = currentRound;
+    document.getElementById('total-rounds').textContent = TOTAL_ROUNDS;
+    document.getElementById('total-rounds-2').textContent = TOTAL_ROUNDS;
+    targetLetter = getRandomLetter();
+    document.getElementById('target-letter').textContent = targetLetter;
+    document.getElementById('letter-input').value = '';
+    document.getElementById('feedback').textContent = '';
+    document.getElementById('letter-input').focus();
+    startTime = Date.now();
+}
+
+document.getElementById('submit-letter').onclick = function() {
+    const input = document.getElementById('letter-input').value.toUpperCase();
+    const reactionTime = Date.now() - startTime;
+    if (!input || input.length !== 1) {
+        document.getElementById('feedback').textContent = 'Please enter a single letter.';
+        return;
+    }
+    if (input === targetLetter) {
+        score++;
+        document.getElementById('feedback').textContent = 'Correct!';
+        logEvent('correct', {input: input, reaction_time: reactionTime});
+    } else {
+        document.getElementById('feedback').textContent = `Incorrect. The correct letter was ${targetLetter}.`;
+        logEvent('incorrect', {input: input, reaction_time: reactionTime});
+    }
+    if (currentRound < TOTAL_ROUNDS) {
+        currentRound++;
+        setTimeout(() => {
+            updateUI();
+        }, 1000);
+    } else {
+        document.getElementById('game-area').innerHTML = `<div class='font-bold text-lg'>Game Over! Final score: ${score} / ${TOTAL_ROUNDS}</div>`;
+        logEvent('end', {final_score: score});
+        sendEventsToBackend();
+    }
+};
+
+document.getElementById('back-to-games').onclick = function() {
+    // If game is still active, end session first
+    if (currentRound <= TOTAL_ROUNDS) {
+        logEvent('manual_end', {final_score: score});
+        document.getElementById('submit-letter').disabled = true;
+        document.getElementById('letter-input').disabled = true;
+        document.getElementById('game-area').innerHTML = `<div class='font-bold text-lg text-red-600'>Session Ended! Final score: ${score} / ${TOTAL_ROUNDS}</div>`;
+        // Save data and then redirect
+        sendEventsToBackend().then(() => {
+            window.location.href = '/games/';
+        }).catch(() => {
+            // Even if save fails, still redirect
+            window.location.href = '/games/';
+        });
+    } else {
+        // Game is already completed, just redirect
+        window.location.href = '/games/';
+    }
+};
+
+function sendEventsToBackend() {
+    return fetch('/games/save_game_result/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({
+            game_type: 'letters',
+            score: score,
+            duration: TOTAL_ROUNDS * 5, // Placeholder
+            decisions: events.filter(e => e.event_type === 'correct' || e.event_type === 'incorrect'),
+            reaction_times: events.filter(e => e.reaction_time !== undefined).map(e => e.reaction_time),
+            raw_data: {events: events}
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            console.log('Session saved successfully');
+        } else {
+            console.error('Error saving session: ' + data.error);
+        }
+        return data;
+    });
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+updateUI();
+</script>
+{% endblock %}

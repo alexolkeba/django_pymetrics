@@ -1,0 +1,241 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard - Pymetric{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  <div class="mb-8">
+    <h1 class="text-3xl font-bold text-gray-900">Welcome back, {{ user.first_name }}!</h1>
+    <p class="text-gray-600 mt-2">Track your progress and complete your psychometric assessment</p>
+  </div>
+
+  <!-- Progress Overview -->
+  <div class="bg-white rounded-lg shadow-sm p-6 mb-8">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-xl font-semibold text-gray-900">Assessment Progress</h2>
+      <span class="text-sm text-gray-500">{{ progress_percentage }}% Complete</span>
+    </div>
+    <div class="w-full bg-gray-200 rounded-full h-2">
+      <div 
+        class="bg-blue-600 h-2 rounded-full transition-all duration-300"
+        style="width: {{ progress_percentage }}%"
+      ></div>
+    </div>
+    <p class="text-sm text-gray-600 mt-2">
+      {{ completed_games }} of {{ total_games }} games completed
+    </p>
+  </div>
+
+  <!-- Stats Grid -->
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    <div class="bg-white p-6 rounded-lg shadow-sm">
+      <div class="flex items-center">
+        <div class="p-2 rounded-lg bg-gray-100 text-green-600">
+          <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <div class="ml-4">
+          <p class="text-sm font-medium text-gray-600">Games Completed</p>
+          <p class="text-2xl font-bold text-gray-900">{{ completed_games }}/{{ total_games }}</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white p-6 rounded-lg shadow-sm">
+      <div class="flex items-center">
+        <div class="p-2 rounded-lg bg-gray-100 text-blue-600">
+          <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+        </div>
+        <div class="ml-4">
+          <p class="text-sm font-medium text-gray-600">Average Score</p>
+          <p class="text-2xl font-bold text-gray-900">{{ average_score }}/100</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white p-6 rounded-lg shadow-sm">
+      <div class="flex items-center">
+        <div class="p-2 rounded-lg bg-gray-100 text-purple-600">
+          <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <div class="ml-4">
+          <p class="text-sm font-medium text-gray-600">Total Time</p>
+          <p class="text-2xl font-bold text-gray-900">{{ total_time }} min</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white p-6 rounded-lg shadow-sm">
+      <div class="flex items-center">
+        <div class="p-2 rounded-lg bg-gray-100 {% if ai_profile %}text-green-600{% else %}text-orange-600{% endif %}">
+          <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+          </svg>
+        </div>
+        <div class="ml-4">
+          <p class="text-sm font-medium text-gray-600">AI Profile</p>
+          <p class="text-2xl font-bold text-gray-900">{% if ai_profile %}Ready{% else %}Pending{% endif %}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recent Games -->
+  <div class="bg-white rounded-lg shadow-sm p-6 mb-8">
+    <h2 class="text-xl font-semibold text-gray-900 mb-4">Recent Games</h2>
+    {% if recent_games %}
+      <div class="space-y-4">
+        {% for result in recent_games %}
+          <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+            <div class="flex items-center">
+              <div class="text-2xl mr-3">{{ result.game.icon }}</div>
+              <div>
+                <p class="font-medium text-gray-900">{{ result.game.name }}</p>
+                <p class="text-sm text-gray-600">{{ result.game.trait }}</p>
+              </div>
+            </div>
+            <div class="text-right">
+              <p class="font-bold text-gray-900">{{ result.score }}/100</p>
+              <p class="text-sm text-gray-600">{{ result.duration_minutes }}min</p>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="text-center py-8">
+        <svg class="h-12 w-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1m4 0h1m-6 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <p class="text-gray-600">No games completed yet</p>
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- AI Profile Results -->
+  {% if ai_profile %}
+    <div class="bg-white rounded-lg shadow-sm p-6">
+      <div class="flex items-center mb-4">
+        <svg class="h-6 w-6 text-yellow-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+        </svg>
+        <h2 class="text-xl font-semibold text-gray-900">AI Assessment Results</h2>
+      </div>
+      
+      <!-- Overall Performance Summary -->
+      <div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-6 mb-6">
+        <div>
+          <div class="mb-4">
+            <div class="flex justify-between items-center mb-2">
+              <span class="text-sm font-medium text-gray-700">Overall Score</span>
+              <span class="text-sm text-gray-500">{{ ai_profile.overall_score_percentage }}%</span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-2">
+              <div 
+                class="bg-gradient-to-r from-blue-500 to-indigo-600 h-2 rounded-full transition-all duration-1000"
+                style="width: {{ ai_profile.overall_score_percentage }}%"
+              ></div>
+            </div>
+          </div>
+          
+          <div class="mb-4">
+            <p class="text-sm font-medium text-gray-700 mb-2">Recommendation</p>
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 
+              {% if ai_profile.recommendation == 'highly_recommended' %}bg-green-100 text-green-800
+              {% elif ai_profile.recommendation == 'consider' %}bg-yellow-100 text-yellow-800
+              {% else %}bg-red-100 text-red-800{% endif %}">
+              {{ ai_profile.recommendation_display }}
+            </span>
+          </div>
+          
+          <div class="text-sm text-gray-600">
+            <p>Confidence Level: <span class="font-semibold">{{ ai_profile.confidence_percentage }}%</span></p>
+            <p>Assessment Date: {{ ai_profile.generated_at|date:"M d, Y" }}</p>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Detailed Trait Analysis -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        <div>
+          <h4 class="font-semibold text-gray-900 mb-4">Cognitive Traits</h4>
+          <div class="space-y-3">
+            {% for trait in ai_profile.traits %}
+              <div class="bg-gray-50 rounded-lg p-3">
+                <div class="flex justify-between items-center mb-2">
+                  <span class="text-sm font-medium text-gray-700">{{ trait.name }}</span>
+                  <span class="text-sm text-gray-500">{{ trait.percentile }}th percentile</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-2 mb-1">
+                  <div 
+                    class="h-2 rounded-full transition-all duration-1000 
+                      {% if trait.benchmark == 'above' %}bg-green-500
+                      {% elif trait.benchmark == 'average' %}bg-yellow-500
+                      {% else %}bg-red-500{% endif %}"
+                    style="width: {{ trait.score_percentage }}%"
+                  ></div>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span class="text-xs text-gray-500">{{ trait.score_percentage }}/100</span>
+                  <span class="text-xs font-medium 
+                    {% if trait.benchmark == 'above' %}text-green-600
+                    {% elif trait.benchmark == 'average' %}text-yellow-600
+                    {% else %}text-red-600{% endif %}">
+                    {{ trait.benchmark|upper }}
+                  </span>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+        
+        <div>
+          <h4 class="font-semibold text-gray-900 mb-4">Key Insights</h4>
+          <div class="mb-4">
+            <p class="text-sm font-medium text-gray-700 mb-2">Top Strengths</p>
+            <ul class="text-sm text-gray-600 space-y-1">
+              {% for strength in ai_profile.strengths %}
+                <li class="flex items-center">
+                  <svg class="h-4 w-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  {{ strength }}
+                </li>
+              {% endfor %}
+            </ul>
+          </div>
+          
+          <div class="mb-4">
+            <p class="text-sm font-medium text-gray-700 mb-2">Areas for Development</p>
+            <ul class="text-sm text-gray-600 space-y-1">
+              {% for weakness in ai_profile.weaknesses %}
+                <li class="flex items-center">
+                  <svg class="h-4 w-4 text-blue-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                  </svg>
+                  {{ weakness }}
+                </li>
+              {% endfor %}
+            </ul>
+          </div>
+          
+          <div class="bg-blue-50 rounded-lg p-4">
+            <h5 class="font-semibold text-blue-900 mb-2">Performance Summary</h5>
+            <p class="text-sm text-blue-800">
+              Based on your assessment across {{ total_games }} cognitive games, you demonstrate 
+              {% if ai_profile.overall_score > 0.8 %} exceptional
+              {% elif ai_profile.overall_score > 0.6 %} strong
+              {% else %} developing{% endif %} 
+              cognitive abilities with particular strengths in {{ ai_profile.strengths.0|lower }}.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+</div>
+{% endblock %} 

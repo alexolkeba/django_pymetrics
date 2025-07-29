@@ -1,0 +1,37 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep:*)",
+      "Bash(ls:*)",
+      "Bash(source:*)",
+      "Bash(find:*)",
+      "Bash(mv:*)",
+      "Bash(mkdir:*)",
+      "Bash(tree:*)",
+      "Bash(ruff:*)",
+      "Bash(touch:*)",
+      "Bash(cat:*)",
+      "Bash(ruff check:*)",
+      "Bash(pytest:*)",
+      "Bash(python:*)",
+      "Bash(python -m pytest:*)",
+      "Bash(python3 -m pytest:*)",
+      "WebFetch(domain:docs.anthropic.com)",
+      "WebFetch(domain:jina.ai)",
+      "WebFetch(domain:seogrove.ai)",
+      "Bash(php:*)",
+      "WebFetch(domain:ai.pydantic.dev)",
+      "WebFetch(domain:platform.openai.com)",
+      "Fetch"
+    ],
+    "deny": []
+  },
+  "context_engineering": {
+    "principles": [
+      "Always perform in-depth research and context gathering before implementation.",
+      "Reference all relevant documentation, code examples, and validation patterns.",
+      "Ensure permissions and commands support robust, scalable, and scientifically valid code.",
+      "Enable one-pass implementation success by providing all needed context and validation steps."
+    ]
+  }
+}

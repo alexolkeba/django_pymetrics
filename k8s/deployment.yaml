@@ -1,0 +1,252 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pymetrics-web
+  namespace: pymetrics
+  labels:
+    app: pymetrics
+    component: web
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: pymetrics
+      component: web
+  template:
+    metadata:
+      labels:
+        app: pymetrics
+        component: web
+    spec:
+      containers:
+      - name: pymetrics-web
+        image: pymetrics:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+          name: http
+        env:
+        - name: DJANGO_SETTINGS_MODULE
+          valueFrom:
+            configMapKeyRef:
+              name: pymetrics-config
+              key: DJANGO_SETTINGS_MODULE
+        - name: DATABASE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: pymetrics-config
+              key: DATABASE_URL
+        - name: REDIS_URL
+          valueFrom:
+            configMapKeyRef:
+              name: pymetrics-config
+              key: REDIS_URL
+        - name: CELERY_BROKER_URL
+          valueFrom:
+            configMapKeyRef:
+              name: pymetrics-config
+              key: CELERY_BROKER_URL
+        - name: CELERY_RESULT_BACKEND
+          valueFrom:
+            configMapKeyRef:
+              name: pymetrics-config
+              key: CELERY_RESULT_BACKEND
+        - name: SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: pymetrics-secret
+              key: DJANGO_SECRET_KEY
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health/
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health/
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        volumeMounts:
+        - name: logs
+          mountPath: /app/logs
+        - name: media
+          mountPath: /app/media
+        - name: ml-models
+          mountPath: /app/ml_models
+      volumes:
+      - name: logs
+        persistentVolumeClaim:
+          claimName: pymetrics-logs-pvc
+      - name: media
+        persistentVolumeClaim:
+          claimName: pymetrics-media-pvc
+      - name: ml-models
+        persistentVolumeClaim:
+          claimName: pymetrics-ml-models-pvc
+      restartPolicy: Always
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pymetrics-celery-worker
+  namespace: pymetrics
+  labels:
+    app: pymetrics
+    component: celery-worker
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: pymetrics
+      component: celery-worker
+  template:
+    metadata:
+      labels:
+        app: pymetrics
+        component: celery-worker
+    spec:
+      containers:
+      - name: pymetrics-celery-worker
+        image: pymetrics:latest
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: DJANGO_SETTINGS_MODULE
+          valueFrom:
+            configMapKeyRef:
+              name: pymetrics-config
+              key: DJANGO_SETTINGS_MODULE
+        - name: DATABASE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: pymetrics-config
+              key: DATABASE_URL
+        - name: REDIS_URL
+          valueFrom:
+            configMapKeyRef:
+              name: pymetrics-config
+              key: REDIS_URL
+        - name: CELERY_BROKER_URL
+          valueFrom:
+            configMapKeyRef:
+              name: pymetrics-config
+              key: CELERY_BROKER_URL
+        - name: CELERY_RESULT_BACKEND
+          valueFrom:
+            configMapKeyRef:
+              name: pymetrics-config
+              key: CELERY_RESULT_BACKEND
+        - name: SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: pymetrics-secret
+              key: DJANGO_SECRET_KEY
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "200m"
+        command: ["celery"]
+        args: ["-A", "pymetric", "worker", "--loglevel=info", "--concurrency=2"]
+        volumeMounts:
+        - name: logs
+          mountPath: /app/logs
+        - name: ml-models
+          mountPath: /app/ml_models
+      volumes:
+      - name: logs
+        persistentVolumeClaim:
+          claimName: pymetrics-logs-pvc
+      - name: ml-models
+        persistentVolumeClaim:
+          claimName: pymetrics-ml-models-pvc
+      restartPolicy: Always
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pymetrics-celery-beat
+  namespace: pymetrics
+  labels:
+    app: pymetrics
+    component: celery-beat
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pymetrics
+      component: celery-beat
+  template:
+    metadata:
+      labels:
+        app: pymetrics
+        component: celery-beat
+    spec:
+      containers:
+      - name: pymetrics-celery-beat
+        image: pymetrics:latest
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: DJANGO_SETTINGS_MODULE
+          valueFrom:
+            configMapKeyRef:
+              name: pymetrics-config
+              key: DJANGO_SETTINGS_MODULE
+        - name: DATABASE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: pymetrics-config
+              key: DATABASE_URL
+        - name: REDIS_URL
+          valueFrom:
+            configMapKeyRef:
+              name: pymetrics-config
+              key: REDIS_URL
+        - name: CELERY_BROKER_URL
+          valueFrom:
+            configMapKeyRef:
+              name: pymetrics-config
+              key: CELERY_BROKER_URL
+        - name: CELERY_RESULT_BACKEND
+          valueFrom:
+            configMapKeyRef:
+              name: pymetrics-config
+              key: CELERY_RESULT_BACKEND
+        - name: SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: pymetrics-secret
+              key: DJANGO_SECRET_KEY
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "50m"
+          limits:
+            memory: "256Mi"
+            cpu: "100m"
+        command: ["celery"]
+        args: ["-A", "pymetric", "beat", "--loglevel=info"]
+        volumeMounts:
+        - name: logs
+          mountPath: /app/logs
+      volumes:
+      - name: logs
+        persistentVolumeClaim:
+          claimName: pymetrics-logs-pvc
+      restartPolicy: Always 

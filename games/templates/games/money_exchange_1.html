@@ -1,0 +1,144 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="max-w-lg mx-auto mt-4">
+    <button id="back-to-games" class="inline-block mb-4 px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300">← Back to Games</button>
+</div>
+<div class="game-container max-w-lg mx-auto mt-8 p-6 bg-white rounded shadow">
+    <h2 class="text-2xl font-bold mb-2">Money Exchange Game #1</h2>
+    <p class="mb-4">Decide how much money to send to your partner each round. Your partner will return a portion. Try to maximize your total earnings over <span id="total-rounds">5</span> rounds.</p>
+    <div id="game-area">
+        <div id="round-info" class="mb-2 font-semibold">Round <span id="round-num">1</span> of <span id="total-rounds-2">5</span></div>
+        <div class="mb-2">Your current balance: $<span id="balance">10</span></div>
+        <label for="send-amount" class="block mb-1">How much do you want to send? ($0-$10)</label>
+        <input type="number" id="send-amount" min="0" max="10" value="5" class="border rounded px-2 py-1 mb-2 w-full" />
+        <button id="send-btn" class="bg-blue-500 text-white px-4 py-2 rounded">Send</button>
+        <div id="feedback" class="mt-3 text-green-600 font-semibold"></div>
+    </div>
+
+</div>
+<script>
+const TOTAL_ROUNDS = 5;
+let currentRound = 1;
+let balance = 10;
+let events = [];
+let difficulty = 'medium'; // Placeholder for dynamic difficulty
+
+function getPartnerReturn(amount, difficulty) {
+    // Simulate partner return based on difficulty
+    if (difficulty === 'easy') return Math.round(amount * 0.8);
+    if (difficulty === 'hard') return Math.round(amount * 0.4);
+    return Math.round(amount * 0.6);
+}
+
+function logEvent(type, data) {
+    events.push({
+        event_type: type,
+        round: currentRound,
+        balance: balance,
+        difficulty: difficulty,
+        timestamp: Date.now(),
+        ...data
+    });
+}
+
+function updateUI() {
+    document.getElementById('round-num').textContent = currentRound;
+    document.getElementById('total-rounds').textContent = TOTAL_ROUNDS;
+    document.getElementById('total-rounds-2').textContent = TOTAL_ROUNDS;
+    document.getElementById('balance').textContent = balance;
+    document.getElementById('send-amount').value = 5;
+    document.getElementById('feedback').textContent = '';
+}
+
+document.getElementById('send-btn').onclick = function() {
+    const sendAmount = parseInt(document.getElementById('send-amount').value, 10);
+    if (isNaN(sendAmount) || sendAmount < 0 || sendAmount > balance) {
+        document.getElementById('feedback').textContent = 'Invalid amount.';
+        return;
+    }
+    // Log send event
+    logEvent('send', {amount_sent: sendAmount});
+    balance -= sendAmount;
+    // Simulate partner return
+    const returned = getPartnerReturn(sendAmount, difficulty);
+    balance += returned;
+    logEvent('receive', {amount_received: returned});
+    document.getElementById('feedback').textContent = `You sent $${sendAmount}, partner returned $${returned}.`;
+    if (currentRound < TOTAL_ROUNDS) {
+        currentRound++;
+        setTimeout(() => {
+            updateUI();
+        }, 1000);
+    } else {
+        document.getElementById('game-area').innerHTML = `<div class='font-bold text-lg'>Game Over! Final balance: $${balance}</div>`;
+        logEvent('end', {final_balance: balance});
+        sendEventsToBackend();
+    }
+};
+
+document.getElementById('back-to-games').onclick = function() {
+    // If game is still active, end session first
+    if (currentRound <= TOTAL_ROUNDS) {
+        logEvent('manual_end', {final_balance: balance});
+        // Disable send button and input
+        document.getElementById('send-btn').disabled = true;
+        document.getElementById('send-amount').disabled = true;
+        document.getElementById('game-area').innerHTML = `<div class='font-bold text-lg text-red-600'>Session Ended! Final balance: $${balance}</div>`;
+        // Save data and then redirect
+        sendEventsToBackend().then(() => {
+            window.location.href = '/games/';
+        }).catch(() => {
+            // Even if save fails, still redirect
+            window.location.href = '/games/';
+        });
+    } else {
+        // Game is already completed, just redirect
+        window.location.href = '/games/';
+    }
+};
+
+function sendEventsToBackend() {
+    return fetch('/games/save_game_result/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({
+            game_type: 'money_exchange_1',
+            score: balance,
+            duration: TOTAL_ROUNDS * 10, // Placeholder
+            decisions: events.filter(e => e.event_type === 'send'),
+            reaction_times: [],
+            raw_data: {events: events}
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            console.log('Session saved successfully');
+        } else {
+            console.error('Error saving session: ' + data.error);
+        }
+        return data;
+    });
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+updateUI();
+</script>
+{% endblock %}

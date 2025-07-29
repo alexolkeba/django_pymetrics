@@ -1,0 +1,78 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: pymetrics-web-service
+  namespace: pymetrics
+  labels:
+    app: pymetrics
+    component: web
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 8000
+    protocol: TCP
+    name: http
+  selector:
+    app: pymetrics
+    component: web
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pymetrics-celery-flower-service
+  namespace: pymetrics
+  labels:
+    app: pymetrics
+    component: celery-flower
+spec:
+  type: ClusterIP
+  ports:
+  - port: 5555
+    targetPort: 5555
+    protocol: TCP
+    name: flower
+  selector:
+    app: pymetrics
+    component: celery-flower
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-service
+  namespace: pymetrics
+  labels:
+    app: pymetrics
+    component: database
+spec:
+  type: ClusterIP
+  ports:
+  - port: 5432
+    targetPort: 5432
+    protocol: TCP
+    name: postgres
+  selector:
+    app: pymetrics
+    component: database
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-service
+  namespace: pymetrics
+  labels:
+    app: pymetrics
+    component: redis
+spec:
+  type: ClusterIP
+  ports:
+  - port: 6379
+    targetPort: 6379
+    protocol: TCP
+    name: redis
+  selector:
+    app: pymetrics
+    component: redis 
