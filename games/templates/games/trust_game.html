@@ -6,7 +6,7 @@
 <div class="min-h-screen bg-gray-50">
   <div class="max-w-4xl mx-auto px-4 py-8">
     <button
-      onclick="window.location.href='{% url 'games:game_list' %}'"
+      id="back-to-games"
       class="flex items-center text-gray-600 hover:text-gray-900 mb-6"
     >
       <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -406,6 +406,15 @@ document.addEventListener('DOMContentLoaded', function() {
   document.getElementById('roundDisplay').textContent = round;
   document.getElementById('moneyDisplay').textContent = totalMoney;
 });
+document.getElementById('back-to-games').onclick = function() {
+    document.getElementById('back-to-games').disabled = true;
+    if (!gameOver) {
+        endGame();
+        setTimeout(() => { window.location.href = '{% url 'games:game_list' %}'; }, 500);
+    } else {
+        window.location.href = '{% url 'games:game_list' %}';
+    }
+};
 </script>
 
 {% csrf_token %}

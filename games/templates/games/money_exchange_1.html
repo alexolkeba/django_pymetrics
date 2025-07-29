@@ -73,10 +73,13 @@ document.getElementById('send-btn').onclick = function() {
         document.getElementById('game-area').innerHTML = `<div class='font-bold text-lg'>Game Over! Final balance: $${balance}</div>`;
         logEvent('end', {final_balance: balance});
         sendEventsToBackend();
+        currentRound = TOTAL_ROUNDS + 1; // Mark game as completed
     }
 };
 
 document.getElementById('back-to-games').onclick = function() {
+    // Disable the button to prevent double clicks
+    document.getElementById('back-to-games').disabled = true;
     // If game is still active, end session first
     if (currentRound <= TOTAL_ROUNDS) {
         logEvent('manual_end', {final_balance: balance});
