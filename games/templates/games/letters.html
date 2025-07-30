@@ -181,7 +181,7 @@
             <h3 style="font-size: 1.5rem; font-weight: bold; color: var(--primary-color);">Game Over!</h3>
             <div id="final-score" style="font-size: 2rem; font-weight: bold; margin: 1rem 0;"></div>
             <p id="final-summary" style="margin-bottom: 1.5rem;"></p>
-            <a href="/games/" class="btn">Return to Games</a>
+            <button id="return-to-games-final-btn" class="btn">Return to Games</button>
         </div>
     </div>
 </div>
@@ -196,6 +196,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const levelEl = document.getElementById('level');
     const instructionModal = document.getElementById('instruction-modal');
     const finalResultsModal = document.getElementById('final-results-modal');
+    const returnToGamesFinalBtn = document.getElementById('return-to-games-final-btn');
     const startGameBtn = document.getElementById('start-game-btn');
     const backToGamesBtn = document.getElementById('back-to-games');
 
@@ -216,6 +217,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let gameStartTime = 0;
     let gameCompleted = false;
     let eventsLog = [];
+    let isSaving = false;
 
     function getCookie(name) {
         let cookieValue = null;
@@ -320,7 +322,7 @@ document.addEventListener('DOMContentLoaded', () => {
         updateDashboard();
     }
 
-    function endGame() {
+    async function endGame() {
         gameCompleted = true;
         clearTimeout(gameTimer);
         clearInterval(spawnInterval);
@@ -335,10 +337,11 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('final-summary').textContent = `You reached level ${level} with ${accuracy}% accuracy and an average reaction time of ${avgReaction} ms.`;
         finalResultsModal.style.display = 'flex';
 
-        saveGameResult();
+        await saveGameResult();
     }
 
-    function quitGame() {
+    async function quitGame() {
+        if (isSaving) return;
         if (gameTimer) {
             clearTimeout(gameTimer);
             clearInterval(spawnInterval);
@@ -346,16 +349,17 @@ document.addEventListener('DOMContentLoaded', () => {
         document.removeEventListener('keydown', handleKeyPress);
         logEvent('game_quit', { final_score: score, final_level: level });
         
-        const savePromise = saveGameResult();
-        savePromise.finally(() => {
-            window.location.href = '/games/';
-        });
+        await saveGameResult();
+        window.location.href = '/games/';
     }
 
     function saveGameResult() {
+        if(isSaving) return Promise.resolve();
+        isSaving = true;
+
         const duration = (Date.now() - gameStartTime) / 1000;
         const payload = {
-            game_type: 'letters_reflex',
+            game_type: 'letters',
             score: score,
             duration: duration.toFixed(2),
             completion_status: gameCompleted ? 'completed' : 'abandoned',
@@ -379,14 +383,24 @@ document.addEventListener('DOMContentLoaded', () => {
         }).then(res => {
             if (!res.ok) console.error('Failed to save game data.');
             return res.json();
-        }).catch(error => console.error('Error saving game data:', error));
+        }).catch(error => console.error('Error saving game data:', error))
+        .finally(() => {
+            isSaving = false;
+        });
     }
 
     // Event Listeners
     startGameBtn.addEventListener('click', startGame);
+    
     backToGamesBtn.addEventListener('click', (e) => {
         e.preventDefault();
         quitGame();
+    });
+
+    returnToGamesFinalBtn.addEventListener('click', () => {
+        if (!isSaving) {
+            window.location.href = '/games/';
+        }
     });
 });
 </script>

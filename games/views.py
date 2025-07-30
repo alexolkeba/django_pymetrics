@@ -5,10 +5,11 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 import json
 from .models import GameSession, GameResult
+from .utils import get_game_list_data
 
 @login_required
 def game_list(request):
-    """Display the list of available games"""
+    """Display the list of available games and progress"""
     GAME_TYPES = [
         ('balloon_risk', 'Adaptive Risk Challenge', 'Test your risk-taking behavior with an adaptive challenge.', 'Risk-Taking', '🎈', 'Pump the balloon to earn money. The more you pump, the more you can earn, but the risk of it bursting also increases. The game adapts to your playstyle. Cash out before it pops!'),
         ('money_exchange_1', 'Money Exchange Game #1', 'Test economic decision-making and trust', 'Economic Decision-Making', '💰', 'You have $10 each round. Decide how much to send to your partner. They will return a portion based on trust. Your goal is to maximize total earnings over multiple rounds.'),
@@ -22,26 +23,29 @@ def game_list(request):
         ('faces_game', 'Faces Game', 'Test facial recognition', 'Facial Recognition', '🙂', 'You\'ll see a target face, then multiple faces. Click on the face that matches the target. Pay attention to facial features and expressions.'),
         ('letters', 'Letters Game', 'Identify and submit letters', 'Verbal Reasoning', '🔤', 'A letter will appear on screen. Type that exact letter as quickly and accurately as possible. Both speed and accuracy matter.'),
         ('magnitudes', 'Numerical Acuity Challenge', 'Test your ability to distinguish between numerical quantities.', 'Quantitative Reasoning', '🔢', 'Choose the larger of two numbers. The difference between them will adapt based on your performance, measuring the precision of your number sense.'),
-
-
         ('reaction_timer', 'Temporal Reflex Challenge', 'Test your reaction speed with precision timing.', 'Reaction Speed', '⚡', 'Wait for the visual cue to change, then respond as quickly as possible. This challenge measures your raw reaction time and consistency under pressure.'),
-        ('sorting_task', 'Cognitive Sorting Challenge', 'Sort objects by changing rules.', 'Cognitive Flexibility', '📦', 'Sort items based on a specific rule (e.g., color or shape). The rule will change unexpectedly, testing your ability to adapt and switch your cognitive set.'),
-        ('pattern_completion', 'Inductive Reasoning Challenge', 'Test your ability to find complex patterns', 'Logical Reasoning', '🧠', 'Identify the underlying rule in a sequence of numbers and find the missing element. The patterns will become more complex as you progress.'),
-        ('stroop_test', 'Cognitive Control Challenge', 'Test your attention and response inhibition with adaptive difficulty.', 'Cognitive Control', '🎨', 'Identify the FONT COLOR of the word, not the word itself. The time you have to respond will change based on your performance, so stay focused!'),
-        ('tower_of_hanoi', 'Tower of Hanoi Game', 'Solve the classic puzzle', 'Planning & Problem Solving', '🗼', 'Move all disks from the left tower to the right tower. You can only move one disk at a time, and you cannot place a larger disk on top of a smaller one. Plan your moves carefully.'),
-        ('emotional_faces', 'Facial Emotion Perception', 'Test your ability to perceive emotions in faces.', 'Emotional Intelligence', '😊', 'Identify the correct emotion from a series of facial expressions. This task measures your accuracy and speed in recognizing social cues.'),
-
-        ('stop_signal', 'Inhibitory Control Challenge', 'Test your ability to stop a response.', 'Impulse Control', '🛑', 'Respond to a primary task, but inhibit your response when a stop signal appears. This measures your ability to control impulsive actions.'),
-        ('digit_span', 'Working Memory Challenge', 'Test your forward and backward digit span.', 'Working Memory', '🧠', 'Recall an ever-increasing sequence of numbers in both forward and backward order. This task measures the capacity of your working memory.'),
-        ('fairness_game', 'Economic Fairness Challenge', 'Test your sense of fairness in economic exchanges.', 'Social Decision-Making', '⚖️', 'Engage in 15 rounds of the Ultimatum Game with an AI partner. Decide how to split $10, but be aware: if your partner rejects your offer, no one gets anything. Your partner\'s behavior will change, testing your adaptability.'),
-        ('attention_network', 'Attention Network Game', 'Test your attention and focus', 'Attention Network', '🧠', 'You\'ll see cues and targets on screen. Respond to targets as quickly and accurately as possible. The cues may help or distract you - focus on the targets.'),
+        ('sorting_task', 'Cognitive Sorting Challenge', 'Test your ability to categorize objects based on changing rules.', 'Cognitive Flexibility', '🔄', 'Sort objects into categories. The sorting rule changes without warning, requiring you to adapt your strategy. This measures cognitive flexibility and rule inference.'),
+        ('pattern_completion', 'Inductive Reasoning Challenge', 'Test your ability to identify and complete complex patterns.', 'Inductive Reasoning', '🧩', 'Identify the underlying rule in a sequence of items and predict the next one. The patterns increase in complexity, testing your abstract reasoning skills.'),
+        ('stroop_test', 'Cognitive Inhibition Challenge', 'Test your ability to suppress automatic responses.', 'Cognitive Inhibition', '🎨', 'Name the color of the ink a word is printed in, while ignoring the word itself (e.g., the word “RED” printed in blue ink). This measures your ability to inhibit a prepotent response.'),
+        ('tower_of_hanoi', 'Progressive Planning Task', 'Test your planning and problem-solving abilities.', 'Planning', '🗼', 'Move a stack of disks from one rod to another, following specific rules. This classic task measures your foresight and ability to break down a problem into smaller steps.'),
+        ('emotional_faces', 'Facial Emotion Perception Task', 'Test your ability to recognize emotions in facial expressions.', 'Emotion Perception', '🎭', 'Identify the emotion conveyed by a series of faces. This task measures your accuracy and speed in perceiving social cues.'),
+        ('trust_game', 'The Trust Dilemma', 'A multi-round game to assess your trust and reciprocity behavior.', 'Social Decision-Making', '🤝', 'Decide how much to entrust to a partner, who then decides how much to return. This game models trust and cooperation in economic interactions.'),
+        ('stop_signal', 'Inhibitory Control Challenge', 'Test your ability to stop a planned action.', 'Inhibitory Control', '🛑', 'Respond quickly to a go signal, but withhold your response if a stop signal appears. This measures your reactive inhibition.'),
+        ('digit_span', 'Working Memory Challenge', 'Test your verbal working memory capacity.', 'Working Memory', '🔢', 'Recall and repeat a sequence of digits. The length of the sequence increases, testing the limits of your short-term memory.'),
+        ('fairness_game', 'Economic Fairness Challenge', 'Assess your sense of fairness in resource allocation.', 'Fairness & Altruism', '⚖️', 'Decide how to split a sum of money between yourself and another person. This game explores your preferences for equity and fairness.'),
+        ('attention_network', 'Attention Control Challenge', 'A comprehensive test of the three attention networks.', 'Attention', '🎯', 'Respond to visual cues that test your alerting, orienting, and executive attention functions. This task provides a detailed profile of your attentional control.')
     ]
 
+    user_results = GameResult.objects.filter(user=request.user)
+
     games = []
-    for gt in GAME_TYPES:
-        game_type, name, description, trait, icon, instructions = gt
-        result_qs = GameResult.objects.filter(user=request.user, game_type=game_type)
-        completed_result_qs = result_qs.filter(completion_status='completed')
+    completed_games_count = 0
+    for game_type, name, description, trait, icon, instructions in GAME_TYPES:
+        completed_result_qs = user_results.filter(game_type=game_type, completion_status='completed')
+        is_completed = completed_result_qs.exists()
+        if is_completed:
+            completed_games_count += 1
+
         games.append({
             'type': game_type,
             'name': name,
@@ -49,12 +53,18 @@ def game_list(request):
             'trait': trait,
             'icon': icon,
             'instructions': instructions,
-            'completed': completed_result_qs.exists(),
-            'score': completed_result_qs.first().score if completed_result_qs.exists() else None
+            'completed': is_completed,
+            'score': completed_result_qs.first().score if is_completed else None
         })
-    
+
+    total_games = len(GAME_TYPES)
+    progress_percentage = (completed_games_count / total_games) * 100 if total_games > 0 else 0
+
     context = {
-        'games': games
+        'games': games,
+        'completed_games': completed_games_count,
+        'total_games': total_games,
+        'progress_percentage': round(progress_percentage),
     }
     return render(request, 'games/game_list.html', context)
 

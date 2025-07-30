@@ -146,7 +146,7 @@
         <h2>Task Complete!</h2>
         <p id="final-score">Your final score: 0</p>
         <p id="final-summary">You chose the hard task X times.</p>
-        <a href="/games/" class="modal-btn">Back to Games</a>
+        <button id="return-to-games-final-btn" class="modal-btn">Back to Games</button>
     </div>
 </div>
 <script>
@@ -171,7 +171,8 @@ document.addEventListener('DOMContentLoaded', () => {
         instructionModal: document.getElementById('instruction-modal'),
         finalResultsModal: document.getElementById('final-results-modal'),
         startGameBtn: document.getElementById('start-game-btn'),
-        backToGamesBtn: document.getElementById('back-to-games')
+        backToGamesBtn: document.getElementById('back-to-games'),
+        returnToGamesFinalBtn: document.getElementById('return-to-games-final-btn')
     };
 
     // State
@@ -185,6 +186,7 @@ document.addEventListener('DOMContentLoaded', () => {
         isResponding: false,
         mathCorrectAnswer: 0,
         taskTimer: null,
+        isSaving: false,
         eventsLog: []
     };
 
@@ -289,25 +291,30 @@ document.addEventListener('DOMContentLoaded', () => {
         presentChoicePhase();
     }
 
-    function endGame() {
+    async function endGame() {
         state.gameCompleted = true;
         logEvent('game_end', { final_score: state.score, hard_tasks_chosen: state.hardTasksChosen });
         document.getElementById('final-score').textContent = `Your final score: ${state.score}`;
         document.getElementById('final-summary').textContent = `You chose the hard task ${state.hardTasksChosen} times.`;
         elements.finalResultsModal.style.display = 'flex';
-        saveGameResult();
+        await saveGameResult();
     }
 
-    function quitGame() {
+    async function quitGame() {
+        if (state.isSaving) return;
         state.gameCompleted = false;
         logEvent('game_quit', { final_score: state.score });
-        saveGameResult().finally(() => { window.location.href = '/games/'; });
+        await saveGameResult();
+        window.location.href = '/games/';
     }
 
     function saveGameResult() {
+        if (state.isSaving) return Promise.resolve();
+        state.isSaving = true;
+
         const duration = (Date.now() - state.gameStartTime) / 1000;
         const payload = {
-            game_type: 'cognitive_effort',
+            game_type: 'easy_or_hard',
             score: state.score,
             duration: duration.toFixed(2),
             completion_status: state.gameCompleted ? 'completed' : 'abandoned',
@@ -317,7 +324,11 @@ document.addEventListener('DOMContentLoaded', () => {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
             body: JSON.stringify(payload)
-        }).then(res => res.json()).catch(error => console.error('Error saving game data:', error));
+        }).then(res => res.json())
+        .catch(error => console.error('Error saving game data:', error))
+        .finally(() => {
+            state.isSaving = false;
+        });
     }
 
     // Event Listeners
@@ -331,6 +342,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (state.currentRound > 0 && state.currentRound < TOTAL_ROUNDS) {
             quitGame();
         } else {
+            window.location.href = '/games/';
+        }
+    });
+
+    elements.returnToGamesFinalBtn.addEventListener('click', () => {
+        if (!state.isSaving) {
             window.location.href = '/games/';
         }
     });

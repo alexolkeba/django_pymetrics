@@ -241,7 +241,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return (congruentRt !== null && incongruentRt !== null) ? incongruentRt - congruentRt : null;
     };
 
-    const endGame = () => {
+    const endGame = async () => {
         gameState = 'finished';
         logEvent('game_end');
         updateDashboard(); // Final update
@@ -256,7 +256,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <div><strong>Average Correct RT:</strong> ${finalAvgRt} ms</div>
         `;
         finalResultsModal.style.display = 'flex';
-        sendEventsToBackend('completed');
+        await sendEventsToBackend('completed');
     };
 
     const logEvent = (type, data = {}) => {
@@ -294,7 +294,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
-    const handleExit = (e) => {
+    const handleExit = async (e) => {
         e.preventDefault();
         if (isSaving) return;
 
@@ -302,7 +302,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (gameState === 'running') {
             gameState = 'abandoned';
             logEvent('game_abandoned');
-            sendEventsToBackend('abandoned').then(() => { window.location.href = url; });
+            await sendEventsToBackend('abandoned');
+            window.location.href = url;
+        } else if (gameState === 'finished') {
+            // If game is finished, save is already handled by endGame.
+            // We just ensure it's not in the middle of saving before navigating.
+            if (!isSaving) {
+                window.location.href = url;
+            }
         } else {
             window.location.href = url;
         }

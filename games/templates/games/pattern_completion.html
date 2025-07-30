@@ -104,7 +104,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let gameEvents = [];
     let roundStartTime;
     let gameTimerInterval;
-    let gameInProgress = false;
+    let gameActive = false;
+    let gameCompleted = false;
+    let isSaving = false;
 
     // --- Pattern Generation Logic ---
     const patternGenerators = {
@@ -143,18 +145,32 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // --- Event Handlers ---
+    const handleExit = async (e) => {
+        e.preventDefault();
+        if (isSaving) return; // Prevent actions while a save is in progress
+
+        // If the game is active and not finished, save it as abandoned first.
+        if (gameActive && !gameCompleted) {
+            await quitGame();
+        }
+
+        // After any required saving, navigate away.
+        window.location.href = gameBody.dataset.gameListUrl;
+    };
+
     startGameBtn.addEventListener('click', startGame);
-    backToGamesBtn.addEventListener('click', quitGame);
-    returnToGamesFinalBtn.addEventListener('click', () => window.location.href = gameBody.dataset.gameListUrl);
+    backToGamesBtn.addEventListener('click', handleExit);
+    returnToGamesFinalBtn.addEventListener('click', handleExit);
 
     // --- Game Flow Functions ---
     function startGame() {
         instructionModal.style.display = 'none';
-        gameInProgress = true;
+        gameActive = true;
         currentRound = 0;
         score = 0;
         difficulty = 1;
         gameEvents = [];
+        logEvent('game_start');
         startTimer();
         nextRound();
     }
@@ -171,66 +187,26 @@ document.addEventListener('DOMContentLoaded', () => {
         roundStartTime = Date.now();
     }
 
-    function generatePattern() {
-        const availableLevels = Object.keys(patternGenerators).filter(level => level <= difficulty);
-        const randomLevel = availableLevels[Math.floor(Math.random() * availableLevels.length)];
-        const { type, sequence, answer } = patternGenerators[randomLevel]();
-
-        const options = new Set([answer]);
-        while (options.size < 4) {
-            const deviation = Math.floor(Math.random() * 10) + 1;
-            const wrongAnswer = answer + (Math.random() > 0.5 ? deviation : -deviation);
-            if (wrongAnswer > 0) options.add(wrongAnswer);
-        }
-        const shuffledOptions = Array.from(options).sort(() => Math.random() - 0.5);
-        return { type, sequence, answer, options: shuffledOptions };
-    }
-
-    function handleAnswer(selectedAnswer, correctAnswer, sequence, type) {
-        const reactionTime = Date.now() - roundStartTime;
-        const isCorrect = selectedAnswer === correctAnswer;
-
-        const roundScore = isCorrect ? Math.max(0, BASE_SCORE_PER_ROUND - Math.floor(reactionTime / 1000) * TIME_PENALTY_FACTOR) : 0;
-        score += roundScore;
-
-        logEvent('answer_selected', {
-            round: currentRound,
-            sequence, type,
-            selectedAnswer, correctAnswer, isCorrect,
-            reactionTime, roundScore
-        });
-
-        if (isCorrect) {
-            difficulty = Math.min(5, difficulty + 0.5);
-        } else {
-            difficulty = Math.max(1, difficulty - 1);
-        }
-
-        updateDashboard();
-        visualFeedback(isCorrect, selectedAnswer);
-
-        setTimeout(nextRound, 1000);
-    }
-
-    function endGame() {
-        gameInProgress = false;
+    async function endGame() {
+        if (!gameActive) return;
+        gameActive = false;
+        gameCompleted = true;
         stopTimer();
         logEvent('game_completed');
         showFinalResults();
-        sendEventsToBackend('completed');
+        await sendEventsToBackend('completed');
     }
 
-    function quitGame() {
-        if (!gameInProgress) {
-            window.location.href = gameBody.dataset.gameListUrl;
-            return;
+    async function quitGame() {
+        if (!gameActive || isSaving) {
+            return; // Don't do anything if game isn't running or already saving
         }
-        gameInProgress = false;
+        gameActive = false;
         stopTimer();
         logEvent('game_quit');
-        sendEventsToBackend('abandoned').finally(() => {
-            window.location.href = gameBody.dataset.gameListUrl;
-        });
+        // This function's only job is to save the abandoned state.
+        // Navigation is handled by the caller, handleExit.
+        await sendEventsToBackend('abandoned');
     }
 
     // --- UI & Rendering ---
@@ -292,7 +268,10 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log(`Event: ${type}`, details);
     }
 
-    function sendEventsToBackend(completionStatus) {
+    async function sendEventsToBackend(completionStatus) {
+        if (isSaving) return;
+        isSaving = true;
+
         const payload = {
             game_name: 'pattern_completion',
             score: score,
@@ -304,21 +283,22 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
 
-        return fetch('/games/save-score/', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': gameBody.dataset.csrfToken
-            },
-            body: JSON.stringify(payload)
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status !== 'success') {
-                console.error('Backend Error:', data.message);
-            }
-        })
-        .catch(error => console.error('Failed to save game data:', error));
+        try {
+            const response = await fetch('/games/save-score/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': gameBody.dataset.csrfToken
+                },
+                body: JSON.stringify(payload)
+            });
+            if (!response.ok) throw new Error('Server responded with an error');
+            return await response.json();
+        } catch (error) {
+            console.error('Failed to save game data:', error);
+        } finally {
+            isSaving = false;
+        }
     }
 });
 </script>

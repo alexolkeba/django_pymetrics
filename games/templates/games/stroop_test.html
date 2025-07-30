@@ -134,6 +134,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let events = [];
     let gameStartTime;
     let gameCompleted = false;
+    let isSaving = false;
 
     // --- FUNCTIONS ---
     const showModal = (modal) => modal.style.display = 'flex';
@@ -262,13 +263,13 @@ document.addEventListener('DOMContentLoaded', () => {
         presentTrial();
     };
 
-    const endGame = () => {
+    const endGame = async () => {
         gameState = 'finished';
         gameCompleted = true;
         events.push({ event_type: 'game_end', timestamp: Date.now() - gameStartTime });
         displayFinalResults();
         showModal(finalResultsModal);
-        sendDataToBackend();
+        await sendDataToBackend();
     };
 
     const displayFinalResults = () => {
@@ -287,6 +288,8 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const sendDataToBackend = () => {
+        if (isSaving) return Promise.resolve();
+        isSaving = true;
         const completionStatus = gameCompleted ? 'completed' : 'abandoned';
         const totalDuration = Date.now() - gameStartTime;
         const score = correctCount * 10 - incorrectCount * 5; // Example scoring
@@ -318,6 +321,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 'X-CSRFToken': '{{ csrf_token }}'
             },
             body: JSON.stringify(data)
+        }).finally(() => {
+            isSaving = false;
         });
     };
 
@@ -325,17 +330,18 @@ document.addEventListener('DOMContentLoaded', () => {
     startGameBtn.addEventListener('click', startGame);
     startIncongruentBtn.addEventListener('click', startIncongruentBlock);
     
-    const handleExit = (e) => {
+    const handleExit = async (e) => {
         e.preventDefault();
-        e.target.style.pointerEvents = 'none';
-        e.target.disabled = true;
-        if (gameState !== 'finished') {
-            sendDataToBackend().finally(() => {
-                window.location.href = GAME_LIST_URL;
-            });
-        } else {
-             window.location.href = GAME_LIST_URL;
+        if (isSaving) return; // Prevent multiple clicks
+
+        // If game is in progress, mark as abandoned and save.
+        if (gameState !== 'finished' && gameStartTime) {
+            gameCompleted = false;
+            await sendDataToBackend();
         }
+
+        // Redirect only after saving is complete (or if no save was needed).
+        window.location.href = GAME_LIST_URL;
     };
 
     returnToGamesBtn.addEventListener('click', handleExit);

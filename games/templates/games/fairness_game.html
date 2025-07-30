@@ -130,18 +130,20 @@ document.addEventListener('DOMContentLoaded', () => {
     let state = {};
     const resetState = () => {
         state = {
+            gameStartTime: 0,
             currentRound: 0,
             totalWinnings: 0,
-            partnerProfile: PARTNER_PROFILES.FAIR,
+            partnerProfile: null,
+            currentRole: null,
+            currentOffer: 0,
             events: [],
-            gameStartTime: 0,
-            roundStartTime: 0,
             gameCompleted: false,
+            isSaving: false,
         };
     };
 
     // --- Core Game Logic ---
-    const startGame = () => {
+    const startGame = async () => {
         resetState();
         state.gameStartTime = Date.now();
         instructionModal.style.display = 'none';
@@ -149,10 +151,10 @@ document.addEventListener('DOMContentLoaded', () => {
         startRound();
     };
 
-    const startRound = () => {
+    const startRound = async () => {
         state.currentRound++;
         if (state.currentRound > TOTAL_ROUNDS) {
-            endGame(true);
+            await endGame(true);
             return;
         }
         // Change partner profile every 5 rounds
@@ -218,11 +220,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 2500);
     };
 
-    const endGame = (completed) => {
+    const endGame = async (completed) => {
         state.gameCompleted = completed;
+        logEvent('game_end', { completed });
         displayFinalResults();
         finalResultsModal.style.display = 'flex';
-        sendDataToBackend();
+        await sendDataToBackend();
     };
 
     // --- UI & Helpers ---
@@ -257,41 +260,60 @@ document.addEventListener('DOMContentLoaded', () => {
         state.events.push({ type, round: state.currentRound, timestamp: Date.now() - state.gameStartTime, ...details });
     };
 
-    const sendDataToBackend = () => {
-        const completionStatus = state.gameCompleted ? 'completed' : 'abandoned';
-        const data = {
-            game_name: GAME_ID,
-            score: state.totalWinnings,
-            duration_ms: Date.now() - state.gameStartTime,
-            completion_status: completionStatus,
-            events: state.events,
-            game_specific_data: { total_winnings: state.totalWinnings }
-        };
+    const sendDataToBackend = async () => {
+        if (state.isSaving) return;
+        state.isSaving = true;
 
-        return fetch('{% url "games:save_score" %}', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': gameBody.dataset.csrfToken },
-            body: JSON.stringify(data),
-        });
+        try {
+            const completionStatus = state.gameCompleted ? 'completed' : 'abandoned';
+            const data = {
+                game_name: GAME_ID,
+                score: state.totalWinnings,
+                duration_ms: Date.now() - state.gameStartTime,
+                completion_status: completionStatus,
+                events: state.events,
+                game_specific_data: { total_winnings: state.totalWinnings }
+            };
+
+            const response = await fetch('{% url "games:save_score" %}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': gameBody.dataset.csrfToken },
+                body: JSON.stringify(data),
+            });
+            if (!response.ok) throw new Error('Server error');
+            return await response.json();
+        } catch (error) {
+            console.error('Error saving data:', error);
+        } finally {
+            state.isSaving = false;
+        }
     };
 
-    const quitGame = () => {
-        if (state.gameStartTime === 0 || finalResultsModal.style.display === 'flex') {
-            window.location.href = gameBody.dataset.gameListUrl;
-            return;
-        }
+    const quitGame = async () => {
+        if (state.isSaving || state.gameStartTime === 0) return;
         state.gameCompleted = false;
-        sendDataToBackend().finally(() => window.location.href = gameBody.dataset.gameListUrl);
+        await sendDataToBackend();
     };
 
     // --- Event Listeners ---
+    const handleExit = async (e) => {
+        e.preventDefault();
+        if (state.isSaving) return;
+
+        if (state.gameStartTime !== 0 && !state.gameCompleted) {
+            await quitGame();
+        }
+
+        window.location.href = gameBody.dataset.gameListUrl;
+    };
+
     startGameBtn.addEventListener('click', startGame);
     offerSlider.addEventListener('input', (e) => offerAmountEl.textContent = `$${e.target.value}`);
     submitOfferBtn.addEventListener('click', handleOfferSubmit);
     acceptBtn.addEventListener('click', () => handleResponse(true));
     rejectBtn.addEventListener('click', () => handleResponse(false));
-    backToGamesBtn.addEventListener('click', (e) => { e.preventDefault(); quitGame(); });
-    returnToGamesFinalBtn.addEventListener('click', (e) => { e.preventDefault(); window.location.href = gameBody.dataset.gameListUrl; });
+    backToGamesBtn.addEventListener('click', handleExit);
+    returnToGamesFinalBtn.addEventListener('click', handleExit);
 });
 </script>
 {% endblock %}

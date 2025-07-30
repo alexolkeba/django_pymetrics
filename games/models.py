@@ -31,41 +31,36 @@ class GameSession(models.Model):
 
 class GameResult(models.Model):
     # Expanded game types to match Pymetrics 16-game suite
-    GAME_TYPES = [
-        # Core Neuroscience Games (12 games)
-        ('balloon_risk', 'The Inflation Gambit', 'A high-stakes game of risk and reward. Pump a balloon to increase your potential earnings, but cash out before it bursts or lose everything. How far are you willing to go?'),
+    GAME_CHOICES = [
+        ('money_exchange_1', 'Money Exchange Game #1'),
+        ('balloon_risk', 'The Inflation Gambit'),
         ('memory_cards', 'Cognitive Atlas Challenge'),
         ('reaction_timer', 'Reaction Timer Game'),
-        ('sorting_task', 'Sorting Task Game'),
-        ('pattern_completion', 'Pattern Completion Game'),
-        ('stroop_test', 'Stroop Test Game'),
-        ('tower_of_hanoi', 'Tower of Hanoi Game'),
-        ('emotional_faces', 'Emotional Faces Game'),
-        ('trust_game', 'Trust Game'),
-        ('stop_signal', 'Stop Signal Game'),
-        ('digit_span', 'Digit Span Game'),
-        ('fairness_game', 'Fairness Game'),
-        
-        # Additional Core Games (8 games)
-        ('money_exchange_1', 'Money Exchange Game #1'),
-        ('money_exchange_2', 'Money Exchange Game #2'),
-        ('easy_or_hard', 'Easy or Hard Game'),
-        ('cards_game', 'Cards Game (Iowa Gambling)'),
-        ('arrows_game', 'Arrows Game'),
-        ('lengths_game', 'Lengths Game'),
-        ('keypresses', 'Keypresses Game'),
-        ('faces_game', 'Faces Game'),
-        
-        # Numerical & Logical Reasoning Games (4 games)
-        ('letters', 'Letters Game (N-back)'),
-        ('magnitudes', 'Magnitudes Game'),
-        ('sequences', 'Sequences Game'),
-        ('shapes', 'Shapes Game'),
+        ('sorting_task', 'Cognitive Sorting Challenge'),
+        ('pattern_completion', 'Inductive Reasoning Challenge'),
+        ('stroop_test', 'Cognitive Control Challenge'),
+        ('tower_of_hanoi', 'Progressive Planning Task'),
+        ('emotional_faces', 'Facial Emotion Perception'),
+        ('stop_signal', 'Inhibitory Control Challenge'),
+        ('digit_span', 'Working Memory Challenge'),
+        ('fairness_game', 'Economic Fairness Challenge'),
+        ('money_exchange_2', 'The Trust Dilemma'),
+        ('easy_or_hard', 'Cognitive Effort Discounting Task'),
+        ('cards_game', 'Strategic Investment Task'),
+        ('arrows_game', 'Flanker Task'),
+        ('lengths_game', 'Perceptual Acuity Challenge'),
+        ('keypresses', 'Rhythmic Precision Task'),
+        ('faces_game', 'Emotional Recognition Task'),
+        ('letters', 'Cognitive Reflex Test'),
+        ('magnitudes', 'Numerical Acuity Challenge'),
+        ('attention_network', 'Attention Control Challenge'),
     ]
     
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     session = models.ForeignKey(GameSession, on_delete=models.CASCADE, null=True, blank=True)
-    game_type = models.CharField(max_length=50, choices=GAME_TYPES)
+    game_type = models.CharField(max_length=50, choices=GAME_CHOICES)
+    
+
     
     # Enhanced scoring system
     score = models.IntegerField(validators=[MinValueValidator(0), MaxValueValidator(100)])
@@ -300,7 +295,7 @@ class GameResult(models.Model):
 class DynamicDifficultyConfig(models.Model):
     """Configuration for dynamic difficulty adaptation"""
     
-    game_type = models.CharField(max_length=50, choices=GameResult.GAME_TYPES)
+    game_type = models.CharField(max_length=50, choices=GameResult.GAME_CHOICES)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     
     # Difficulty parameters

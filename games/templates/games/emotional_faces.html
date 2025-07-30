@@ -102,19 +102,20 @@ document.addEventListener('DOMContentLoaded', () => {
     let state = {};
     const resetState = () => {
         state = {
+            gameStartTime: 0,
             currentTrial: 0,
             correctCount: 0,
+            currentCorrectEmotion: null,
+            trialStartTime: 0,
             trialList: [],
             events: [],
-            gameStartTime: 0,
-            trialStartTime: 0,
             gameCompleted: false,
-            currentCorrectEmotion: '',
+            isSaving: false,
         };
     };
 
     // --- Core Game Logic ---
-    const startGame = () => {
+    const startGame = async () => {
         resetState();
         state.trialList = generateTrialList();
         state.gameStartTime = Date.now();
@@ -138,9 +139,9 @@ document.addEventListener('DOMContentLoaded', () => {
         return trials;
     };
 
-    const nextTrial = () => {
+    const nextTrial = async () => {
         if (state.currentTrial >= TOTAL_TRIALS) {
-            endGame(true);
+            await endGame(true);
             return;
         }
 
@@ -188,14 +189,15 @@ document.addEventListener('DOMContentLoaded', () => {
         logEvent('trial_end', { choice: chosenEmotion, is_correct: isCorrect, reaction_time: reactionTime });
         updateDashboard();
 
-        setTimeout(nextTrial, 2000);
+        setTimeout(() => nextTrial(), 2000);
     };
 
-    const endGame = (completed) => {
+    const endGame = async (completed) => {
         state.gameCompleted = completed;
+        logEvent('game_end', { completed });
         displayFinalResults();
         finalResultsModal.style.display = 'flex';
-        sendDataToBackend();
+        await sendDataToBackend();
     };
 
     // --- UI & Helpers ---
@@ -218,38 +220,58 @@ document.addEventListener('DOMContentLoaded', () => {
         state.events.push({ type, trial: state.currentTrial, timestamp: Date.now() - state.gameStartTime, ...details });
     };
 
-    const sendDataToBackend = () => {
-        const completionStatus = state.gameCompleted ? 'completed' : 'abandoned';
-        const score = state.correctCount;
-        const data = {
-            game_name: GAME_ID,
-            score: score,
-            duration_ms: Date.now() - state.gameStartTime,
-            completion_status: completionStatus,
-            events: state.events,
-            game_specific_data: { accuracy: (state.correctCount / TOTAL_TRIALS) }
-        };
+    const sendDataToBackend = async () => {
+        if (state.isSaving) return;
+        state.isSaving = true;
 
-        return fetch('{% url "games:save_score" %}', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': gameBody.dataset.csrfToken },
-            body: JSON.stringify(data),
-        });
+        try {
+            const completionStatus = state.gameCompleted ? 'completed' : 'abandoned';
+            const score = state.correctCount;
+            const data = {
+                game_name: GAME_ID,
+                score: score,
+                duration_ms: Date.now() - state.gameStartTime,
+                completion_status: completionStatus,
+                events: state.events,
+                game_specific_data: { accuracy: (state.correctCount / TOTAL_TRIALS) }
+            };
+
+            const response = await fetch('{% url "games:save_score" %}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': gameBody.dataset.csrfToken },
+                body: JSON.stringify(data),
+            });
+
+            if (!response.ok) throw new Error('Server error');
+            return await response.json();
+        } catch (error) {
+            console.error('Error saving data:', error);
+        } finally {
+            state.isSaving = false;
+        }
     };
 
-    const quitGame = () => {
-        if (state.gameStartTime === 0 || finalResultsModal.style.display === 'flex') {
-            window.location.href = gameBody.dataset.gameListUrl;
-            return;
-        }
+    const quitGame = async () => {
+        if (state.isSaving || state.gameStartTime === 0) return;
         state.gameCompleted = false;
-        sendDataToBackend().finally(() => window.location.href = gameBody.dataset.gameListUrl);
+        await sendDataToBackend();
     };
 
     // --- Event Listeners ---
+    const handleExit = async (e) => {
+        e.preventDefault();
+        if (state.isSaving) return;
+
+        if (state.gameStartTime !== 0 && !state.gameCompleted) {
+            await quitGame();
+        }
+
+        window.location.href = gameBody.dataset.gameListUrl;
+    };
+
     startGameBtn.addEventListener('click', startGame);
-    backToGamesBtn.addEventListener('click', (e) => { e.preventDefault(); quitGame(); });
-    returnToGamesFinalBtn.addEventListener('click', (e) => { e.preventDefault(); window.location.href = gameBody.dataset.gameListUrl; });
+    backToGamesBtn.addEventListener('click', handleExit);
+    returnToGamesFinalBtn.addEventListener('click', handleExit);
 });
 </script>
 {% endblock %}

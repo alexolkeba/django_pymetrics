@@ -233,6 +233,8 @@
             } catch (error) {
                 console.error('Failed to save game data:', error);
                 return null; // Indicate failure
+            } finally {
+                state.isSaving = false;
             }
         };
 
@@ -242,22 +244,21 @@
             clearTimeout(state.timeoutId);
 
             state.events.push({ type: 'game_end', timestamp: performance.now(), completed: isCompleted });
-            
+
             if (isCompleted) {
                 showFinalResults();
             }
-            
+
             await sendEventsToBackend(isCompleted);
-            
-            if (!isCompleted) {
-                window.location.href = getGameListUrl();
-            }
         };
 
         const quitGame = async () => {
+            // Centralized function to handle all exits.
             if (state.gameState !== 'finished') {
-                await endGame(false); // Mark as abandoned
+                await endGame(false); // Mark as abandoned and save.
             }
+            // After saving is complete (or if already finished), navigate away.
+            window.location.href = getGameListUrl();
         };
 
         // --- Event Listeners ---
@@ -276,14 +277,13 @@
             }
         });
 
-        elements.backToGamesBtn.addEventListener('click', (e) => {
+        const handleExit = (e) => {
             e.preventDefault();
             quitGame();
-        });
+        };
 
-        elements.returnToGamesFinalBtn.addEventListener('click', () => {
-            window.location.href = getGameListUrl();
-        });
+        elements.backToGamesBtn.addEventListener('click', handleExit);
+        elements.returnToGamesFinalBtn.addEventListener('click', handleExit);
 
         // Initialize
         setStimulusState('waiting', 'Get Ready');

@@ -190,7 +190,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function endGame(completed) {
+    async function endGame(completed) {
         if (isSaving) return;
         gameCompleted = completed;
         logEvent('game_end', { final_balance: balance, completed: gameCompleted });
@@ -203,7 +203,7 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
         elements.finalSummary.innerHTML = summaryHtml;
         elements.finalResultsModal.style.display = 'flex';
-        sendEventsToBackend();
+        await sendEventsToBackend();
     }
 
     async function quitGame(e) {
@@ -257,7 +257,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const csrfToken = elements.gameBody.dataset.csrfToken;
 
         const payload = {
-            game_type: 'trust_dilemma',
+            game_type: 'money_exchange_2',
             score: balance,
             duration: duration,
             completion_status: gameCompleted ? 'completed' : 'abandoned',

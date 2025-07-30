@@ -8,6 +8,7 @@ from django.views.decorators.http import require_http_methods
 from .forms import UserRegistrationForm, CandidateProfileForm
 from .models import User, RecruiterProfile, CandidateProgress, CandidateProfile
 from games.models import GameSession, GameResult
+from games.utils import get_game_list_data
 from ai_model.models import TraitProfile
 import json
 from django.utils import timezone
@@ -23,21 +24,6 @@ def admin_dashboard(request):
     }
     return render(request, 'accounts/admin_dashboard.html', context)
 
-from django.shortcuts import render, redirect
-from django.contrib.auth import authenticate, login, logout
-from django.contrib.auth.decorators import login_required
-from django.contrib import messages
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_http_methods
-from .forms import UserRegistrationForm, CandidateProfileForm
-from .models import User, RecruiterProfile, CandidateProgress, CandidateProfile
-from games.models import GameSession, GameResult
-from ai_model.models import TraitProfile
-import json
-from django.utils import timezone
-import csv
-from django.http import StreamingHttpResponse, HttpResponseForbidden
 
 def home(request):
     if request.user.is_authenticated:
@@ -92,37 +78,30 @@ def logout_view(request):
 def candidate_dashboard(request):
     user = request.user
     user_results = GameResult.objects.filter(user=user)
-    
-    # List of all 20 games
-    GAME_TYPES = [
-        'balloon_risk', 'money_exchange_1', 'money_exchange_2', 'easy_or_hard', 'cards_game',
-        'arrows_game', 'lengths_game', 'keypresses', 'faces_game', 'letters', 'magnitudes', 
-        'sequences', 'memory_cards', 'reaction_timer', 'sorting_task', 'pattern_completion', 
-        'stroop_test', 'tower_of_hanoi', 'emotional_faces', 'trust_game', 'stop_signal', 
-        'digit_span', 'fairness_game', 'attention_network'
-    ]
-    total_games = len(GAME_TYPES)
-    completed_games = user_results.filter(game_type__in=GAME_TYPES).count()
-    progress_percentage = (completed_games / total_games) * 100 if total_games > 0 else 0
+
+    # Get game data using the helper function
+    game_data = get_game_list_data(user)
+    total_games = game_data['total_games']
+    completed_games = game_data['completed_games']
+    progress_percentage = game_data['progress_percentage']
+    available_game_types = game_data['available_game_types']
 
     # Calculate average score
+    completed_results = user_results.filter(completion_status='completed', game_type__in=available_game_types)
     average_score = 0
-    if user_results.exists():
-        total_score = sum(result.score for result in user_results if result.game_type in GAME_TYPES)
-        count = user_results.filter(game_type__in=GAME_TYPES).count()
-        average_score = round(total_score / count) if count > 0 else 0
+    if completed_results.exists():
+        total_score = sum(result.score for result in completed_results)
+        average_score = round(total_score / completed_results.count())
 
     # Calculate total time in minutes
     total_time = 0
-    if user_results.exists():
-        total_duration = sum(result.duration for result in user_results if result.game_type in GAME_TYPES)
-        total_time = round(total_duration / 60) if total_duration > 0 else 0
-    
-
+    if completed_results.exists():
+        total_duration = sum(result.duration for result in completed_results)
+        total_time = round(total_duration / 60)
 
     # Get recent games (last 3)
     recent_games = []
-    for result in user_results.filter(game_type__in=GAME_TYPES).order_by('-completed_at')[:3]:
+    for result in user_results.filter(game_type__in=available_game_types).order_by('-completed_at')[:3]:
         recent_games.append({
             'game': {
                 'name': result.get_game_name(),
@@ -175,7 +154,7 @@ def candidate_dashboard(request):
         'total_time': total_time,
         'recent_games': recent_games,
         'ai_profile': ai_profile,
-        'game_types': GAME_TYPES
+        'game_types': available_game_types
     }
 
     return render(request, 'accounts/candidate_dashboard.html', context)

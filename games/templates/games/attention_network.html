@@ -549,7 +549,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return { alerting, orienting, executive };
     };
 
-    const endGame = () => {
+    const endGame = async () => {
         gameState = 'finished';
         logEvent('game_end');
         const scores = calculateNetworkScores();
@@ -565,7 +565,7 @@ document.addEventListener('DOMContentLoaded', () => {
              <div>Executive Control: <strong style="color: var(--primary-color)">${scores.executive} ms</strong></div>`;
 
         finalResultsModal.style.display = 'flex';
-        sendEventsToBackend();
+        await sendEventsToBackend();
     };
 
     const sendEventsToBackend = () => {
@@ -605,11 +605,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- EVENT LISTENERS ---
     startGameBtn.addEventListener('click', startGame);
 
-    backToGamesBtn.addEventListener('click', (e) => {
+    backToGamesBtn.addEventListener('click', async (e) => {
         e.preventDefault();
+        if (isSaving) return;
         e.target.style.pointerEvents = 'none';
+
         if (gameState === 'running') {
-            sendEventsToBackend().then(navigateToGamesList);
+            await sendEventsToBackend();
+            navigateToGamesList();
         } else {
             navigateToGamesList();
         }
@@ -617,7 +620,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     returnToGamesBtn.addEventListener('click', (e) => {
         e.preventDefault();
-        navigateToGamesList();
+        if (!isSaving) {
+            navigateToGamesList();
+        }
     });
 });
 </script>

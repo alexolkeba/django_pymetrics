@@ -179,7 +179,7 @@
             <h3 style="font-size: 1.5rem; font-weight: bold; color: var(--primary-color);">Challenge Complete!</h3>
             <div id="final-score" style="font-size: 2rem; font-weight: bold; margin: 1rem 0;"></div>
             <p id="final-summary" style="margin-bottom: 1.5rem;"></p>
-            <a href="/games/" class="choice-btn" style="background-color: var(--primary-color); text-decoration: none;">Return to Games</a>
+            <button id="return-to-games-final-btn" class="choice-btn" style="background-color: var(--primary-color);">Return to Games</button>
         </div>
     </div>
 </div>
@@ -200,7 +200,8 @@ document.addEventListener('DOMContentLoaded', () => {
         instructionModal: document.getElementById('instruction-modal'),
         finalResultsModal: document.getElementById('final-results-modal'),
         startGameBtn: document.getElementById('start-game-btn'),
-        backToGamesBtn: document.getElementById('back-to-games')
+        backToGamesBtn: document.getElementById('back-to-games'),
+        returnToGamesFinalBtn: document.getElementById('return-to-games-final-btn')
     };
 
     // Game Config
@@ -220,7 +221,8 @@ document.addEventListener('DOMContentLoaded', () => {
         gameStartTime: 0,
         gameCompleted: false,
         eventsLog: [],
-        isResponding: false
+        isResponding: false,
+        isSaving: false
     };
 
     function getCookie(name) {
@@ -314,7 +316,7 @@ document.addEventListener('DOMContentLoaded', () => {
         generateTrial();
     }
 
-    function endGame() {
+    async function endGame() {
         state.gameCompleted = true;
         logEvent('game_end', { final_score: state.score, final_difficulty: state.difficulty });
 
@@ -323,19 +325,22 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('final-summary').textContent = `Your Just Noticeable Difference (JND) was estimated at ${jnd}%. This is the smallest difference you could reliably detect.`;
         elements.finalResultsModal.style.display = 'flex';
 
-        saveGameResult();
+        await saveGameResult();
     }
 
-    function quitGame() {
+    async function quitGame() {
+        if (state.isSaving) return;
         logEvent('game_quit', { final_score: state.score });
-        const savePromise = saveGameResult();
-        savePromise.finally(() => { window.location.href = '/games/'; });
+        await saveGameResult();
+        window.location.href = '/games/';
     }
 
     function saveGameResult() {
+        if (state.isSaving) return Promise.resolve();
+        state.isSaving = true;
         const duration = (Date.now() - state.gameStartTime) / 1000;
         const payload = {
-            game_type: 'lengths_acuity',
+            game_type: 'lengths_game',
             score: state.score,
             duration: duration.toFixed(2),
             completion_status: state.gameCompleted ? 'completed' : 'abandoned',
@@ -358,7 +363,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }).then(res => {
             if (!res.ok) console.error('Failed to save game data.');
             return res.json();
-        }).catch(error => console.error('Error saving game data:', error));
+        }).catch(error => console.error('Error saving game data:', error))
+        .finally(() => {
+            state.isSaving = false;
+        });
     }
 
     // Event Listeners
@@ -368,6 +376,12 @@ document.addEventListener('DOMContentLoaded', () => {
     elements.backToGamesBtn.addEventListener('click', (e) => {
         e.preventDefault();
         quitGame();
+    });
+
+    elements.returnToGamesFinalBtn.addEventListener('click', () => {
+        if (!state.isSaving) {
+            window.location.href = '/games/';
+        }
     });
 });
 </script>

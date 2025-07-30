@@ -113,7 +113,15 @@ document.addEventListener('DOMContentLoaded', () => {
     function initGame() {
         elements.startGameBtn.addEventListener('click', startGame);
         elements.backToGamesBtn.addEventListener('click', (e) => quitGame(e));
-        elements.returnToGamesFinalBtn.addEventListener('click', (e) => quitGame(e));
+        elements.returnToGamesFinalBtn.addEventListener('click', () => {
+            // The save operation is triggered by endGame and runs in the background.
+            // We just need to make sure we don't redirect while it's in progress.
+            if (!isSaving) {
+                window.location.href = elements.gameBody.dataset.gameListUrl;
+            }
+            // If saving is in progress, the click does nothing, preventing a race condition.
+            // The user can click again once saving is complete.
+        });
     }
 
     function startGame() {
@@ -193,7 +201,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function endGame(completed) {
+    async function endGame(completed) {
         if (isSaving) return;
         gameCompleted = completed;
         clearInterval(timerInterval);
@@ -206,7 +214,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <span>Total Time: <strong>${totalTime}s</strong></span>
         `;
         elements.finalResultsModal.style.display = 'flex';
-        sendEventsToBackend();
+        await sendEventsToBackend();
     }
 
     async function quitGame(e) {
@@ -215,8 +223,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const targetUrl = elements.gameBody.dataset.gameListUrl;
         if (!gameCompleted && gameStartTime) {
-            endGame(false);
-            await sendEventsToBackend();
+            // endGame is now async and handles the save
+            await endGame(false);
         }
         window.location.href = targetUrl;
     }

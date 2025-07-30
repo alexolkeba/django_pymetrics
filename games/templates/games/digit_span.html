@@ -109,30 +109,30 @@ document.addEventListener('DOMContentLoaded', () => {
     let state = {};
     const resetState = () => {
         state = {
-            taskType: 'forward',
+            gameStartTime: 0,
             currentSpan: STARTING_SPAN,
             maxForwardSpan: 0,
             maxBackwardSpan: 0,
+            taskType: 'forward', // or 'backward'
             incorrectStreak: 0,
-            currentSequence: '',
+            currentSequence: [],
             events: [],
-            gameStartTime: 0,
-            trialStartTime: 0,
             gameCompleted: false,
+            isSaving: false,
         };
     };
 
     // --- Core Game Logic ---
-    const startGame = () => {
+    const startGame = async () => {
         resetState();
         setupNumpad();
         state.gameStartTime = Date.now();
         instructionModal.style.display = 'none';
         logEvent('game_start');
-        nextTrial();
+        await nextTrial();
     };
 
-    const nextTrial = () => {
+    const nextTrial = async () => {
         if (state.incorrectStreak >= MAX_INCORRECT_STREAK) {
             if (state.taskType === 'forward') {
                 state.taskType = 'backward';
@@ -140,10 +140,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 state.incorrectStreak = 0;
                 logEvent('task_switch', { new_task: 'backward' });
                 feedbackText.textContent = 'Next up: Backward Span!';
-                setTimeout(nextTrial, FEEDBACK_DELAY_MS * 1.5);
+                updateDashboard();
+                await new Promise(resolve => setTimeout(resolve, FEEDBACK_DELAY_MS * 1.5));
+                await nextTrial();
                 return;
             } else {
-                endGame(true);
+                await endGame(true);
                 return;
             }
         }
@@ -204,14 +206,15 @@ document.addEventListener('DOMContentLoaded', () => {
             state.incorrectStreak++;
         }
         
-        setTimeout(nextTrial, FEEDBACK_DELAY_MS);
+        setTimeout(() => nextTrial(), FEEDBACK_DELAY_MS);
     };
 
-    const endGame = (completed) => {
+    const endGame = async (completed) => {
         state.gameCompleted = completed;
+        logEvent('game_end', { completed });
         displayFinalResults();
         finalResultsModal.style.display = 'flex';
-        sendDataToBackend();
+        await sendDataToBackend();
     };
 
     // --- UI & Helpers ---
@@ -252,39 +255,59 @@ document.addEventListener('DOMContentLoaded', () => {
         state.events.push({ type, timestamp: Date.now() - state.gameStartTime, ...details });
     };
 
-    const sendDataToBackend = () => {
-        const completionStatus = state.gameCompleted ? 'completed' : 'abandoned';
-        const score = state.maxForwardSpan + state.maxBackwardSpan;
-        const data = {
-            game_name: GAME_ID,
-            score: score,
-            duration_ms: Date.now() - state.gameStartTime,
-            completion_status: completionStatus,
-            events: state.events,
-            game_specific_data: { max_forward_span: state.maxForwardSpan, max_backward_span: state.maxBackwardSpan }
-        };
+    const sendDataToBackend = async () => {
+        if (state.isSaving) return;
+        state.isSaving = true;
 
-        return fetch('{% url "games:save_score" %}', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': gameBody.dataset.csrfToken },
-            body: JSON.stringify(data),
-        });
+        try {
+            const completionStatus = state.gameCompleted ? 'completed' : 'abandoned';
+            const score = state.maxForwardSpan + state.maxBackwardSpan;
+            const data = {
+                game_name: GAME_ID,
+                score: score,
+                duration_ms: Date.now() - state.gameStartTime,
+                completion_status: completionStatus,
+                events: state.events,
+                game_specific_data: { max_forward_span: state.maxForwardSpan, max_backward_span: state.maxBackwardSpan }
+            };
+
+            const response = await fetch('{% url "games:save_score" %}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': gameBody.dataset.csrfToken },
+                body: JSON.stringify(data),
+            });
+
+            if (!response.ok) throw new Error('Server error');
+            return await response.json();
+        } catch (error) {
+            console.error('Error saving data:', error);
+        } finally {
+            state.isSaving = false;
+        }
     };
 
-    const quitGame = () => {
-        if (state.gameStartTime === 0 || finalResultsModal.style.display === 'flex') {
-            window.location.href = gameBody.dataset.gameListUrl;
-            return;
-        }
+    const quitGame = async () => {
+        if (state.isSaving || state.gameStartTime === 0) return;
         state.gameCompleted = false;
-        sendDataToBackend().finally(() => window.location.href = gameBody.dataset.gameListUrl);
+        await sendDataToBackend();
     };
 
     // --- Event Listeners ---
+    const handleExit = async (e) => {
+        e.preventDefault();
+        if (state.isSaving) return;
+
+        if (state.gameStartTime !== 0 && !state.gameCompleted) {
+            await quitGame();
+        }
+
+        window.location.href = gameBody.dataset.gameListUrl;
+    };
+
     startGameBtn.addEventListener('click', startGame);
     submitBtn.addEventListener('click', handleSubmit);
-    backToGamesBtn.addEventListener('click', (e) => { e.preventDefault(); quitGame(); });
-    returnToGamesFinalBtn.addEventListener('click', (e) => { e.preventDefault(); window.location.href = gameBody.dataset.gameListUrl; });
+    backToGamesBtn.addEventListener('click', handleExit);
+    returnToGamesFinalBtn.addEventListener('click', handleExit);
 });
 </script>
 {% endblock %}

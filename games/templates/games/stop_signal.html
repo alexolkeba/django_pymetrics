@@ -127,7 +127,12 @@ document.addEventListener('DOMContentLoaded', () => {
     function initGame() {
         elements.startGameBtn.addEventListener('click', startGame);
         elements.backToGamesBtn.addEventListener('click', (e) => quitGame(e));
-        elements.returnToGamesFinalBtn.addEventListener('click', (e) => quitGame(e));
+        elements.returnToGamesFinalBtn.addEventListener('click', () => {
+            if (!state.isSaving) {
+                window.location.href = elements.gameBody.dataset.gameListUrl;
+            }
+        });
+        elements.instructionModal.style.display = 'flex';
         document.addEventListener('keydown', handleKeyPress);
     }
 
@@ -231,21 +236,23 @@ document.addEventListener('DOMContentLoaded', () => {
         state.timeouts.push(feedbackTimeout);
     }
 
-    function endGame(completed) {
-        if (state.isSaving) return;
+    async function endGame(completed) {
         clearTimeouts();
+        window.removeEventListener('keydown', handleKeyPress);
         state.gameCompleted = completed;
-        logEvent('game_end', { completed });
+        logEvent('game_end', { completed: state.gameCompleted });
 
         const ssrt = calculateSSRT();
         elements.finalSummary.innerHTML = `
-            <div class="stat-card"><div class="value">${ssrt}ms</div><div class="label">SSRT</div></div>
-            <div class="stat-card"><div class="value">${getAccuracy(state.goSuccessCount, state.goTotalCount)}%</div><div class="label">Go Accuracy</div></div>
-            <div class="stat-card"><div class="value">${getAccuracy(state.stopSuccessCount, state.stopTotalCount)}%</div><div class="label">Stop Accuracy</div></div>
-            <div class="stat-card"><div class="value">${config.totalTrials}</div><div class="label">Total Trials</div></div>
+            <div><div class="label">Go Accuracy</div><div class="value">${getAccuracy(state.goSuccessCount, state.goTotalCount)}%</div></div>
+            <div><div class="label">Stop Accuracy</div><div class="value">${getAccuracy(state.stopSuccessCount, state.stopTotalCount)}%</div></div>
+            <div><div class="label">Avg. Go RT</div><div class="value">${state.goRTs.length > 0 ? Math.round(state.goRTs.reduce((a,b)=>a+b,0)/state.goRTs.length) : '-'}ms</div></div>
+            <div><div class="label">Final SSRT</div><div class="value">${ssrt}ms</div></div>
+            <div><div class="label">Stop Signals</div><div class="value">${state.stopTotalCount}</div></div>
+            <div><div class="label">Total Trials</div><div class="value">${config.totalTrials}</div></div>
         `;
         elements.finalResultsModal.style.display = 'flex';
-        sendEventsToBackend();
+        await sendEventsToBackend();
     }
 
     async function quitGame(e) {
@@ -253,9 +260,15 @@ document.addEventListener('DOMContentLoaded', () => {
         if (state.isSaving) return;
 
         const targetUrl = elements.gameBody.dataset.gameListUrl;
-        if (state.gameStartTime && !state.gameCompleted) {
-            endGame(false);
-            await sendEventsToBackend();
+        // If game hasn't started or is already finished and showing results, just navigate
+        if (!state.gameStartTime || elements.finalResultsModal.style.display === 'flex') {
+            window.location.href = targetUrl;
+            return;
+        }
+
+        // If game is in progress, mark as abandoned, save, then navigate.
+        if (!state.gameCompleted) {
+            await endGame(false);
         }
         window.location.href = targetUrl;
     }
@@ -338,6 +351,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- INITIALIZATION ---
+    elements.startGameBtn.addEventListener('click', startGame);
+    elements.backToGamesBtn.addEventListener('click', quitGame);
+    elements.returnToGamesFinalBtn.addEventListener('click', quitGame);
+
     initGame();
 });
 </script>

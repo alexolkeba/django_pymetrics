@@ -139,7 +139,7 @@
         <h2>Task Complete!</h2>
         <p id="final-score">Your final net worth: $0</p>
         <p id="final-summary"></p>
-        <a href="/games/" class="modal-btn">Back to Games</a>
+        <button id="return-to-games-final-btn" class="modal-btn">Back to Games</button>
     </div>
 </div>
 <script>
@@ -154,6 +154,7 @@ let events = [];
 let gameCompleted = false;
 let pickStartTime;
 let decksLocked = true;
+let isSaving = false;
 
 // Iowa Gambling Task Payoff Structure (standardized)
 // Net per 10 cards: A = -$250, B = -$250, C = +$250, D = +$250
@@ -173,6 +174,7 @@ const feedbackAreaEl = document.getElementById('feedback-area');
 const decksContainer = document.getElementById('decks-container');
 const instructionModal = document.getElementById('instruction-modal');
 const finalResultsModal = document.getElementById('final-results-modal');
+const returnToGamesFinalBtn = document.getElementById('return-to-games-final-btn');
 
 function logEvent(type, data) {
     const event = {
@@ -251,18 +253,18 @@ function showFeedback(gain, loss) {
     }
 }
 
-function endGame() {
+async function endGame() {
     gameCompleted = true;
     decksLocked = true;
     logEvent('game_end', { final_score: score });
 
     document.getElementById('final-score').textContent = `Your final net worth: $${score}`;
-    const summary = score > STARTING_SCORE 
+    const summary = score > STARTING_SCORE
         ? `You made a profit of $${score - STARTING_SCORE}. Well done!`
         : `You ended with a loss of $${STARTING_SCORE - score}.`;
     document.getElementById('final-summary').textContent = summary;
     finalResultsModal.style.display = 'flex';
-    sendEventsToBackend();
+    await sendEventsToBackend();
 }
 
 function startGame() {
@@ -289,6 +291,8 @@ function getCookie(name) {
 }
 
 function sendEventsToBackend() {
+    if (isSaving) return Promise.resolve();
+    isSaving = true;
     const completionStatus = gameCompleted ? 'completed' : 'abandoned';
     const totalDuration = events.length > 1 ? new Date(events[events.length - 1].timestamp) - new Date(events[0].timestamp) : 0;
 
@@ -310,6 +314,9 @@ function sendEventsToBackend() {
     .then(data => {
         if (!data.success) console.error('Error saving session: ' + data.error);
         return data;
+    })
+    .finally(() => {
+        isSaving = false;
     });
 }
 
@@ -317,15 +324,21 @@ function sendEventsToBackend() {
 document.getElementById('start-game-btn').addEventListener('click', startGame);
 decksContainer.addEventListener('click', handleDeckPick);
 
-document.getElementById('back-to-games').addEventListener('click', function() {
+returnToGamesFinalBtn.addEventListener('click', () => {
+    if (!isSaving) {
+        window.location.href = '/games/';
+    }
+});
+
+document.getElementById('back-to-games').addEventListener('click', async function() {
+    if (isSaving) return;
     this.disabled = true;
+
     if (!gameCompleted) {
         logEvent('game_abandoned', { final_score: score });
-        sendEventsToBackend().finally(() => {
-            window.location.href = '/games/';
-        });
+        await sendEventsToBackend();
+        window.location.href = '/games/';
     } else {
-        // Game is over, data is already being sent, just redirect
         window.location.href = '/games/';
     }
 });

@@ -126,6 +126,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let gameStartTime = 0;
     let roundStartTime = 0;
     let gameCompleted = false;
+    let isSaving = false;
 
     // --- Core Game Logic ---
     const startGame = () => {
@@ -135,10 +136,10 @@ document.addEventListener('DOMContentLoaded', () => {
         startRound();
     };
 
-    const startRound = () => {
+    const startRound = async () => {
         currentRound++;
         if (currentRound > TOTAL_ROUNDS) {
-            endGame(true);
+            await endGame(true);
             return;
         }
         pumpsThisRound = 0;
@@ -152,7 +153,7 @@ document.addEventListener('DOMContentLoaded', () => {
         logEvent('round_start');
     };
 
-    const pumpBalloon = () => {
+    const pumpBalloon = async () => {
         pumpsThisRound++;
         potentialWinnings += BASE_PUMP_VALUE;
         burstProbability += burstProbabilityGrowth;
@@ -164,37 +165,41 @@ document.addEventListener('DOMContentLoaded', () => {
         logEvent('pump');
 
         if (Math.random() < burstProbability) {
-            handleBurst();
+            await handleBurst();
         } else {
             updateUI();
         }
     };
 
-    const cashOut = () => {
+    const cashOut = async () => {
         totalWinnings += potentialWinnings;
         logEvent('cash_out');
         // ADAPTIVE LOGIC: If player cashes out, slightly decrease risk for next round (encourage more pumps)
         burstProbabilityGrowth = Math.max(MIN_BURST_PROBABILITY_GROWTH, burstProbabilityGrowth - PROBABILITY_ADJUSTMENT_FACTOR);
         setControls(false);
-        setTimeout(startRound, 1000);
+        updateUI();
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        await startRound();
     };
 
-    const handleBurst = () => {
+    const handleBurst = async () => {
         potentialWinnings = 0;
         logEvent('burst');
         // ADAPTIVE LOGIC: If balloon bursts, slightly increase risk for next round (discourage risky behavior)
         burstProbabilityGrowth = Math.min(MAX_BURST_PROBABILITY_GROWTH, burstProbabilityGrowth + PROBABILITY_ADJUSTMENT_FACTOR * 2);
         setControls(false);
         balloon.classList.add('burst');
-        setTimeout(startRound, 1500);
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        await startRound();
     };
 
-    const endGame = (completed) => {
-        gameCompleted = completed;
+    const endGame = async (completed) => {
         setControls(false);
+        gameCompleted = completed;
+        logEvent('game_end');
         displayFinalResults();
         finalResultsModal.style.display = 'flex';
-        sendDataToBackend();
+        await sendDataToBackend();
     };
 
     // --- UI & Controls ---
@@ -247,58 +252,74 @@ document.addEventListener('DOMContentLoaded', () => {
         events.push(event);
     };
 
-    const sendDataToBackend = () => {
-        const completionStatus = gameCompleted ? 'completed' : 'abandoned';
-        const totalDuration = Date.now() - gameStartTime;
-        const totalPumps = events.filter(e => e.action === 'pump').length;
-        const totalBursts = events.filter(e => e.action === 'burst').length;
+    const sendDataToBackend = async () => {
+        if (isSaving) return;
+        isSaving = true;
 
-        const data = {
-            game_name: GAME_ID,
-            score: totalWinnings,
-            duration_ms: totalDuration,
-            completion_status: completionStatus,
-            events: events,
-            game_specific_data: {
-                total_pumps: totalPumps,
-                total_bursts: totalBursts,
-                total_cash_outs: events.filter(e => e.action === 'cash_out').length,
-                final_burst_probability_growth: burstProbabilityGrowth,
-                avg_pumps_per_round: totalPumps / (currentRound > 1 ? currentRound - 1 : 1)
-            }
-        };
+        try {
+            const completionStatus = gameCompleted ? 'completed' : 'abandoned';
+            const totalDuration = Date.now() - gameStartTime;
+            const totalPumps = events.filter(e => e.action === 'pump').length;
+            const totalBursts = events.filter(e => e.action === 'burst').length;
 
-        return fetch('{% url "games:save_score" %}', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': gameBody.dataset.csrfToken,
-            },
-            body: JSON.stringify(data),
-        });
+            const data = {
+                game_name: GAME_ID,
+                score: totalWinnings,
+                duration_ms: totalDuration,
+                completion_status: completionStatus,
+                events: events,
+                game_specific_data: {
+                    total_pumps: totalPumps,
+                    total_bursts: totalBursts,
+                    total_cash_outs: events.filter(e => e.action === 'cash_out').length,
+                    final_burst_probability_growth: burstProbabilityGrowth,
+                    avg_pumps_per_round: totalPumps / (currentRound > 1 ? currentRound - 1 : 1)
+                }
+            };
+
+            const response = await fetch('{% url "games:save_score" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': gameBody.dataset.csrfToken,
+                },
+                body: JSON.stringify(data),
+            });
+
+            if (!response.ok) throw new Error('Server error');
+            return await response.json();
+        } catch (error) {
+            console.error('Error saving data:', error);
+        } finally {
+            isSaving = false;
+        }
     };
 
-    const quitGame = () => {
-        if (gameStartTime === 0) {
-            window.location.href = gameBody.dataset.gameListUrl;
-            return;
-        }
-        if (finalResultsModal.style.display === 'flex') {
-             window.location.href = gameBody.dataset.gameListUrl;
-             return;
-        }
+    const quitGame = async () => {
+        if (isSaving || gameStartTime === 0 || gameCompleted) return;
         gameCompleted = false;
-        sendDataToBackend().finally(() => {
-            window.location.href = gameBody.dataset.gameListUrl;
-        });
+        await sendDataToBackend();
     };
 
     // --- Event Listeners ---
+    const handleExit = async (e) => {
+        e.preventDefault();
+        if (isSaving) return;
+
+        // If the game has started and is not finished, save as abandoned
+        if (gameStartTime !== 0 && !gameCompleted) {
+            await quitGame();
+        }
+
+        // Redirect after saving is complete (or if no save was needed)
+        window.location.href = gameBody.dataset.gameListUrl;
+    };
+
     startGameBtn.addEventListener('click', startGame);
     pumpBtn.addEventListener('click', pumpBalloon);
     cashOutBtn.addEventListener('click', cashOut);
-    backToGamesBtn.addEventListener('click', (e) => { e.preventDefault(); quitGame(); });
-    returnToGamesFinalBtn.addEventListener('click', (e) => { e.preventDefault(); window.location.href = gameBody.dataset.gameListUrl; });
+    backToGamesBtn.addEventListener('click', handleExit);
+    returnToGamesFinalBtn.addEventListener('click', handleExit);
 });
 </script>
 {% endblock %}

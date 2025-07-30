@@ -128,14 +128,16 @@ document.addEventListener('DOMContentLoaded', () => {
     function resetState() {
         state = {
             gameActive: false,
-            gameFinished: false,
-            currentTrial: 0,
+            isSaving: false,
+            isPaused: false,
+            gameCompleted: false,
+            currentTrial: -1,
             score: 0,
             timeLimit: config.INITIAL_TIME_LIMIT,
-            trialStartTime: 0,
-            responseTimeout: null,
+            eventLog: [],
             trialList: [],
-            eventLog: []
+            currentTrialTimeout: null,
+            gameStartTime: null
         };
     }
 
@@ -145,12 +147,16 @@ document.addEventListener('DOMContentLoaded', () => {
         createTrialList();
         updateDashboard();
         elements.instructionModal.style.display = 'flex';
-        elements.finalResultsModal.style.display = 'none';
 
-        // Event Listeners
         elements.startGameBtn.onclick = startGame;
-        elements.backToGamesBtn.onclick = () => quitGame('abandoned');
-        elements.returnToGamesFinalBtn.onclick = () => quitGame('completed');
+        const handleExit = (e) => {
+            e.preventDefault();
+            quitGame();
+        };
+
+        elements.backToGamesBtn.addEventListener('click', handleExit);
+        elements.returnToGamesFinalBtn.addEventListener('click', handleExit);
+
         document.addEventListener('keydown', handleKeyPress);
     }
 
@@ -161,7 +167,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 state.trialList.push({ icon, category });
             });
         }
-        // Create a balanced list of 60 trials
         let fullList = [];
         while (fullList.length < config.TOTAL_TRIALS) {
             fullList.push(...shuffleArray([...state.trialList]));
@@ -169,15 +174,16 @@ document.addEventListener('DOMContentLoaded', () => {
         state.trialList = fullList.slice(0, config.TOTAL_TRIALS);
     }
 
-    function startGame() {
+    async function startGame() {
         elements.instructionModal.style.display = 'none';
-        state.gameActive = true;
-        runTrial();
+        state.gameStartTime = performance.now();
+        await runTrial();
     }
 
-    function runTrial() {
-        if (state.currentTrial >= config.TOTAL_TRIALS) {
-            endGame('completed');
+    async function runTrial() {
+        state.currentTrial++;
+        if (state.isPaused || state.currentTrial >= config.TOTAL_TRIALS) {
+            if (!state.isPaused) await endGame('completed');
             return;
         }
 
@@ -188,9 +194,10 @@ document.addEventListener('DOMContentLoaded', () => {
         updateDashboard();
 
         state.trialStartTime = performance.now();
+        state.gameActive = true;
         startTimerAnimation();
 
-        state.responseTimeout = setTimeout(() => {
+        state.currentTrialTimeout = setTimeout(() => {
             handleResponse(null, null); // Timeout = no response
         }, state.timeLimit);
     }
@@ -202,16 +209,16 @@ document.addEventListener('DOMContentLoaded', () => {
         handleResponse(userCategory, rt);
     }
 
-    function handleResponse(userCategory, rt) {
-        if (!state.gameActive) return; // Prevent multiple responses for one trial
-        state.gameActive = false; // Temporarily disable input
-        clearTimeout(state.responseTimeout);
+    async function handleResponse(userCategory, rt) {
+        if (!state.gameActive) return;
+        state.gameActive = false;
+        clearTimeout(state.currentTrialTimeout);
 
         const trial = state.trialList[state.currentTrial];
         const correct = userCategory === trial.category;
         let outcome;
 
-        if (userCategory === null) { // Timeout
+        if (userCategory === null) {
             outcome = 'miss';
             state.score += config.SCORE_INCORRECT;
             elements.feedbackArea.textContent = 'Too slow!';
@@ -221,9 +228,8 @@ document.addEventListener('DOMContentLoaded', () => {
             state.score += config.SCORE_CORRECT;
             elements.feedbackArea.textContent = 'Correct!';
             elements.stimulusArea.style.color = 'var(--correct-color)';
-            // Decrease time limit for next trial
             state.timeLimit = Math.max(config.MIN_TIME_LIMIT, state.timeLimit - config.TIME_DECREMENT);
-        } else { // Incorrect
+        } else {
             outcome = 'incorrect';
             state.score += config.SCORE_INCORRECT;
             elements.feedbackArea.textContent = `Incorrect!`;
@@ -231,33 +237,36 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         logEvent(trial, userCategory, rt, correct, outcome);
-        state.currentTrial++;
         updateDashboard();
 
-        setTimeout(() => {
-            state.gameActive = true;
-            runTrial();
-        }, 800); // Inter-trial interval
+        await new Promise(resolve => setTimeout(resolve, 800));
+        await runTrial();
     }
 
-    function endGame(completionStatus) {
-        if (state.gameFinished) return;
-        state.gameFinished = true;
+    async function endGame(completionStatus) {
+        state.isPaused = true;
         state.gameActive = false;
-        clearTimeout(state.responseTimeout);
-
+        state.gameCompleted = completionStatus === 'completed';
+        window.removeEventListener('keydown', handleKeyPress);
+        clearTrialState();
         displayFinalResults();
-        saveGameResult(completionStatus);
+        await saveGameResult(completionStatus);
     }
 
-    async function quitGame(completionStatus) {
-        if (!state.gameFinished) {
-            state.gameFinished = true;
-            state.gameActive = false;
-            clearTimeout(state.responseTimeout);
-            await saveGameResult(completionStatus);
+    async function quitGame() {
+        if (state.isSaving) return;
+        const targetUrl = elements.body.dataset.gameListUrl;
+
+        if (!state.gameStartTime || state.gameCompleted) {
+            window.location.href = targetUrl;
+            return;
         }
-        window.location.href = elements.body.dataset.gameListUrl;
+
+        state.isPaused = true;
+        state.gameActive = false;
+        clearTimeout(state.currentTrialTimeout);
+        await endGame('abandoned');
+        window.location.href = targetUrl;
     }
 
     // --- UI & DISPLAY ---
@@ -267,7 +276,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const accuracy = respondedTrials.length > 0 ? (correctTrials.length / respondedTrials.length) * 100 : 0;
         const avgRt = respondedTrials.length > 0 ? respondedTrials.reduce((acc, e) => acc + e.rt, 0) / respondedTrials.length : 0;
 
-        elements.trialCount.textContent = `${state.currentTrial}/${config.TOTAL_TRIALS}`;
+        elements.trialCount.textContent = `${Math.min(state.currentTrial, config.TOTAL_TRIALS)}/${config.TOTAL_TRIALS}`;
         elements.score.textContent = state.score;
         elements.accuracy.textContent = `${accuracy.toFixed(1)}%`;
         elements.avgRt.textContent = avgRt.toFixed(0);
@@ -294,7 +303,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function startTimerAnimation() {
         elements.timerBar.style.transition = 'none';
         elements.timerBar.style.width = '100%';
-        // Force reflow
         elements.timerBar.offsetHeight;
         elements.timerBar.style.transition = `width ${state.timeLimit / 1000}s linear`;
         elements.timerBar.style.width = '0%';
@@ -322,6 +330,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function saveGameResult(completionStatus) {
+        if (state.isSaving || !state.gameStartTime) return;
+        state.isSaving = true;
+
         const csrfToken = elements.body.dataset.csrfToken;
         const url = "{% url 'games:save_game_result' %}";
         const finalAccuracy = state.eventLog.length > 0 ? (state.eventLog.filter(e => e.correct).length / state.eventLog.length) : 0;
@@ -350,6 +361,8 @@ document.addEventListener('DOMContentLoaded', () => {
             return await response.json();
         } catch (error) {
             console.error('Error saving game result:', error);
+        } finally {
+            state.isSaving = false;
         }
     }
 
