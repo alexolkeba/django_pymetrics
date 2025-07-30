@@ -312,7 +312,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const stopTimer = () => clearInterval(state.timer);
 
-    const displayFinalResults = () => {
+    const displayFinalResults = async () => {
+        // Save data first to prevent race conditions before showing the final modal.
+        await sendDataToBackend();
+
         const totalDuration = (Date.now() - state.gameStartTime) / 1000;
         const totalMoves = state.events.filter(e => e.type === 'card_flip').length / 2;
         const totalMatches = state.events.filter(e => e.type === 'match_found').length;
@@ -324,6 +327,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <div><strong>Total Moves:</strong></div><div>${totalMoves.toFixed(0)}</div>
             <div><strong>Total Time:</strong></div><div>${totalDuration.toFixed(1)}s</div>
         `;
+        finalResultsModal.style.display = 'flex';
     };
 
     // --- DATA HANDLING ---

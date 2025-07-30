@@ -223,7 +223,7 @@
             };
 
             try {
-                const response = await fetch('/games/save-score/', {
+                                const response = await fetch('{% url "games:save_score" %}', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
                     body: JSON.stringify(payload),
@@ -245,11 +245,12 @@
 
             state.events.push({ type: 'game_end', timestamp: performance.now(), completed: isCompleted });
 
+            // Always save data before showing final UI or allowing navigation.
+            await sendEventsToBackend(isCompleted);
+
             if (isCompleted) {
                 showFinalResults();
             }
-
-            await sendEventsToBackend(isCompleted);
         };
 
         const quitGame = async () => {

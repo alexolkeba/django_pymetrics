@@ -112,7 +112,7 @@
     .modal-btn:hover { background-color: #0088cc; }
 </style>
 
-<div class="game-container max-w-2xl mx-auto mt-8">
+<div class="game-container max-w-2xl mx-auto mt-8" data-csrf-token="{{ csrf_token }}" data-game-list-url="{% url 'games:game_list' %}">
     <h2 class="text-3xl font-bold mb-4 text-center">Emotional Recognition Task</h2>
     <div class="dashboard">
         <div class="metric">
@@ -171,7 +171,8 @@ document.addEventListener('DOMContentLoaded', () => {
         finalResultsModal: document.getElementById('final-results-modal'),
         startGameBtn: document.getElementById('start-game-btn'),
         backToGamesBtn: document.getElementById('back-to-games'),
-        returnToGamesFinalBtn: document.getElementById('return-to-games-final-btn')
+        returnToGamesFinalBtn: document.getElementById('return-to-games-final-btn'),
+        gameContainer: document.querySelector('.game-container')
     };
 
     // Stimuli Set (using local paths)
@@ -201,20 +202,7 @@ document.addEventListener('DOMContentLoaded', () => {
         eventsLog: []
     };
 
-    function getCookie(name) {
-        let cookieValue = null;
-        if (document.cookie && document.cookie !== '') {
-            const cookies = document.cookie.split(';');
-            for (let i = 0; i < cookies.length; i++) {
-                const cookie = cookies[i].trim();
-                if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                    break;
-                }
-            }
-        }
-        return cookieValue;
-    }
+
 
     function logEvent(type, data) {
         state.eventsLog.push({
@@ -279,56 +267,68 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function endGame() {
+        if (state.gameCompleted) return;
         state.gameCompleted = true;
         logEvent('game_end', { final_score: state.score, hits: state.hits });
 
         const finalAccuracy = state.currentRound > 0 ? (state.hits / state.currentRound * 100).toFixed(1) : 'N/A';
         document.getElementById('final-score').textContent = `Your score: ${state.score}`;
         document.getElementById('final-summary').textContent = `Accuracy: ${finalAccuracy}%`;
+        
+        // Save data first to prevent race condition, then show modal.
+        await saveGameResult();
         elements.finalResultsModal.style.display = 'flex';
-
-        await saveGameResult();
     }
 
-    async function quitGame() {
+    async function handleExit(e) {
+        e.preventDefault();
         if (state.isSaving) return;
-        state.gameCompleted = false;
-        logEvent('game_quit', { final_score: state.score });
-        await saveGameResult();
-        window.location.href = '/games/';
+
+        // If game started but not finished, save as abandoned
+        if (state.gameStartTime && !state.gameCompleted) {
+            state.gameCompleted = false; // Mark as abandoned
+            logEvent('game_quit', { final_score: state.score });
+            await saveGameResult();
+        }
+
+        // Redirect after saving is complete (or if no save was needed)
+        window.location.href = elements.gameContainer.dataset.gameListUrl;
     }
 
-    function saveGameResult() {
-        if (state.isSaving) return Promise.resolve();
+    async function saveGameResult() {
+        if (state.isSaving) return;
         state.isSaving = true;
 
-        const duration = (Date.now() - state.gameStartTime) / 1000;
+        const duration_ms = (state.gameStartTime) ? (Date.now() - state.gameStartTime) : 0;
         const payload = {
-            game_type: 'faces_game',
+            game_name: 'faces_game',
             score: state.score,
-            duration: duration.toFixed(2),
+            duration_ms: duration_ms,
             completion_status: state.gameCompleted ? 'completed' : 'abandoned',
+            events: state.eventsLog,
             raw_data: {
                 hits: state.hits,
-                total_rounds: state.currentRound,
-                events: state.eventsLog
+                total_rounds: state.currentRound
             }
         };
 
-        return fetch('/games/save-result/', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken')
-            },
-            body: JSON.stringify(payload)
-        }).then(res => {
-            if (!res.ok) console.error('Failed to save game data.');
-            return res.json();
-        }).catch(error => console.error('Error saving game data:', error))
-        .finally(() => {
+        try {
+            const response = await fetch("{% url 'games:save_score' %}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': elements.gameContainer.dataset.csrfToken
+                },
+                body: JSON.stringify(payload)
+            });
+            if (!response.ok) {
+                console.error('Failed to save game data.', await response.text());
+            }
+        } catch (error) {
+            console.error('Error saving game data:', error);
+        } finally {
             state.isSaving = false;
-        });
+        }
     }
 
     // Event Listeners
@@ -336,20 +336,8 @@ document.addEventListener('DOMContentLoaded', () => {
     elements.choiceButtons.forEach(btn => {
         btn.addEventListener('click', () => handleChoice(btn.dataset.choice));
     });
-    elements.backToGamesBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        if (state.currentRound > 0 && state.currentRound < STIMULI.length) {
-            quitGame();
-        } else {
-            window.location.href = '/games/';
-        }
-    });
-
-    elements.returnToGamesFinalBtn.addEventListener('click', () => {
-        if (!state.isSaving) {
-            window.location.href = '/games/';
-        }
-    });
+    elements.backToGamesBtn.addEventListener('click', handleExit);
+    elements.returnToGamesFinalBtn.addEventListener('click', handleExit);
 });
 </script>
 {% endblock %}

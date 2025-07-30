@@ -76,7 +76,13 @@
     <div id="instruction-modal" class="modal" style="display: flex;">
         <div class="modal-content">
             <h3 style="font-size: 1.5rem; font-weight: bold; color: var(--primary-color);">Welcome to the Adaptive Risk Challenge!</h3>
-            <p style="margin: 1rem 0;">Your goal is to earn as much money as possible over 30 rounds. In each round, pump the balloon to increase its value. The more you pump, the more you can earn, but the risk of it bursting also increases. The game adapts to your playstyle. Cash out to secure your earnings before it pops!</p>
+            <p style="text-align: left; margin-bottom: 1.5rem;">
+                Your goal is to earn as much as possible by inflating balloons. Each pump increases your potential reward, but also the chance the balloon will pop.
+                <br><br>
+                You can <strong>Cash Out</strong> at any time to bank your earnings for the round. If it pops, you lose everything from that round.
+                <br><br>
+                This game measures your risk-taking behavior and adapts to your decisions. How far are you willing to push your luck?
+            </p>
             <button id="start-game-btn" class="btn">Start Game</button>
         </div>
     </div>
@@ -194,12 +200,13 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const endGame = async (completed) => {
+        if (gameCompleted) return;
         setControls(false);
         gameCompleted = completed;
-        logEvent('game_end');
+        logEvent(completed ? 'game_completed' : 'game_abandoned');
+        await sendDataToBackend();
         displayFinalResults();
         finalResultsModal.style.display = 'flex';
-        await sendDataToBackend();
     };
 
     // --- UI & Controls ---

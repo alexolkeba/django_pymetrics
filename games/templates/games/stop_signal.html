@@ -75,25 +75,19 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-    // --- CONFIG & STATE ---
     const config = {
         totalTrials: 80,
         stopSignalProbability: 0.25,
         fixationDuration: 500, // ms
         goSignalMaxDuration: 1000, // ms
-        feedbackDuration: 700, // ms
+        ssdStep: 50, // ms, how much to adjust SSD by
         initialSSD: 250, // ms
-        ssdStep: 50, // ms, staircase adjustment
-        minSSD: 50,
-        maxSSD: 800,
     };
 
-    let state = {
+    const state = {
+        gameStartTime: null,
         currentTrial: 0,
         ssd: config.initialSSD,
-        gameStartTime: null,
-        trialStartTime: null,
-        gameState: 'idle',
         events: [],
         goRTs: [],
         goSuccessCount: 0,
@@ -102,7 +96,7 @@ document.addEventListener('DOMContentLoaded', () => {
         stopTotalCount: 0,
         gameCompleted: false,
         isSaving: false,
-        currentStimulus: { type: null, direction: null },
+        currentStimulus: { type: null, direction: null, responded: false, goSignalTime: 0, stopSignalTime: 0 },
         timeouts: [],
     };
 
@@ -125,14 +119,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- GAME LOGIC ---
     function initGame() {
-        elements.startGameBtn.addEventListener('click', startGame);
-        elements.backToGamesBtn.addEventListener('click', (e) => quitGame(e));
-        elements.returnToGamesFinalBtn.addEventListener('click', () => {
-            if (!state.isSaving) {
-                window.location.href = elements.gameBody.dataset.gameListUrl;
-            }
+        Object.assign(state, {
+            gameStartTime: null, currentTrial: 0, ssd: config.initialSSD, events: [], goRTs: [],
+            goSuccessCount: 0, goTotalCount: 0, stopSuccessCount: 0, stopTotalCount: 0,
+            gameCompleted: false, isSaving: false,
+            currentStimulus: { type: null, direction: null, responded: false, goSignalTime: 0, stopSignalTime: 0 },
+            timeouts: [],
         });
+
         elements.instructionModal.style.display = 'flex';
+        elements.finalResultsModal.style.display = 'none';
+        updateDashboard();
+
+        elements.startGameBtn.addEventListener('click', startGame);
+        elements.backToGamesBtn.addEventListener('click', handleExit);
+        elements.returnToGamesFinalBtn.addEventListener('click', handleExit);
         document.addEventListener('keydown', handleKeyPress);
     }
 
@@ -144,133 +145,117 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function runTrial() {
-        if (state.currentTrial >= config.totalTrials) {
-            endGame(true);
+        clearTimeouts();
+        state.currentTrial++;
+        if (state.currentTrial > config.totalTrials) {
+            endGame();
             return;
         }
-        state.currentTrial++;
-        updateDashboard();
-        clearTimeouts();
 
-        state.gameState = 'fixation';
-        elements.stimulusArea.innerHTML = '<div style="color: var(--muted-text-color)">+</div>';
+        updateDashboard();
+        elements.stimulusArea.innerHTML = '';
         elements.feedbackArea.textContent = '';
 
-        const fixationTimeout = setTimeout(() => {
-            state.trialStartTime = performance.now();
-            const isStopTrial = Math.random() < config.stopSignalProbability;
-            const direction = Math.random() < 0.5 ? 'left' : 'right';
-            state.currentStimulus = { type: isStopTrial ? 'stop' : 'go', direction };
+        const isStopTrial = Math.random() < config.stopSignalProbability;
+        const direction = Math.random() < 0.5 ? 'left' : 'right';
+        state.currentStimulus = { type: isStopTrial ? 'stop' : 'go', direction: direction, responded: false };
+
+        state.timeouts.push(setTimeout(() => {
+            displayGoSignal(direction);
+            state.currentStimulus.goSignalTime = performance.now();
 
             if (isStopTrial) {
-                state.stopTotalCount++;
-                state.gameState = 'stop_signal';
-                displayGoSignal(direction);
-                const stopTimeout = setTimeout(() => {
+                state.timeouts.push(setTimeout(() => {
                     displayStopSignal();
-                }, state.ssd);
-                state.timeouts.push(stopTimeout);
-            } else {
-                state.goTotalCount++;
-                state.gameState = 'go_signal';
-                displayGoSignal(direction);
+                    state.currentStimulus.stopSignalTime = performance.now();
+                }, state.ssd));
             }
 
-            const noResponseTimeout = setTimeout(() => handleResponse(null), config.goSignalMaxDuration);
-            state.timeouts.push(noResponseTimeout);
+            state.timeouts.push(setTimeout(() => {
+                if (!state.currentStimulus.responded) handleResponse(null);
+            }, config.goSignalMaxDuration));
 
-        }, config.fixationDuration);
-        state.timeouts.push(fixationTimeout);
+        }, config.fixationDuration));
     }
 
     function handleKeyPress(e) {
-        if (state.gameState !== 'go_signal' && state.gameState !== 'stop_signal') return;
-        if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
-        handleResponse(e.key);
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+            handleResponse(e.key);
+        }
     }
 
     function handleResponse(key) {
-        if (state.gameState === 'fixation' || state.gameState === 'feedback') return;
+        if (state.currentStimulus.responded) return;
+        state.currentStimulus.responded = true;
         clearTimeouts();
 
-        const rt = performance.now() - state.trialStartTime;
-        const { type, direction } = state.currentStimulus;
-        let outcome, feedbackText;
+        const responseTime = performance.now() - state.currentStimulus.goSignalTime;
+        const correctKey = state.currentStimulus.direction === 'left' ? 'ArrowLeft' : 'ArrowRight';
+        const wasCorrect = key === correctKey;
 
-        if (type === 'go') {
-            if (!key) {
-                outcome = 'go_miss';
-                feedbackText = 'Miss!';
-            } else if ((key === 'ArrowLeft' && direction === 'left') || (key === 'ArrowRight' && direction === 'right')) {
-                outcome = 'go_correct';
-                feedbackText = 'Correct!';
+        if (state.currentStimulus.type === 'go') {
+            state.goTotalCount++;
+            if (wasCorrect) {
                 state.goSuccessCount++;
-                state.goRTs.push(rt);
+                state.goRTs.push(responseTime);
+                showFeedback(`Correct! RT: ${Math.round(responseTime)}ms`, 'success');
             } else {
-                outcome = 'go_incorrect';
-                feedbackText = 'Wrong Key!';
+                showFeedback('Wrong key!', 'error');
             }
-        } else { // stop trial
-            if (!key) {
-                outcome = 'stop_success';
-                feedbackText = 'Good stop!';
+            logEvent('trial_response', { type: 'go', correct: wasCorrect, rt: responseTime });
+        } else { // Stop trial
+            state.stopTotalCount++;
+            if (key === null) {
                 state.stopSuccessCount++;
-                state.ssd = Math.min(config.maxSSD, state.ssd + config.ssdStep);
+                state.ssd = Math.min(config.initialSSD + 250, state.ssd + config.ssdStep);
+                showFeedback('Good stop!', 'success');
+                logEvent('trial_response', { type: 'stop', responded: false, new_ssd: state.ssd });
             } else {
-                outcome = 'stop_fail';
-                feedbackText = 'Too fast!';
-                state.ssd = Math.max(config.minSSD, state.ssd - config.ssdStep);
+                state.ssd = Math.max(50, state.ssd - config.ssdStep);
+                showFeedback('Responded on a stop trial!', 'error');
+                logEvent('trial_response', { type: 'stop', responded: true, correct_key: wasCorrect, rt: responseTime, new_ssd: state.ssd });
             }
         }
-        logEvent('trial_response', { trial: state.currentTrial, type, direction, response: key, rt, outcome, new_ssd: state.ssd });
-        showFeedback(feedbackText, outcome);
+        setTimeout(runTrial, 1200);
     }
 
     function showFeedback(text, outcome) {
-        state.gameState = 'feedback';
         elements.feedbackArea.textContent = text;
-        elements.feedbackArea.style.color = (outcome.includes('correct') || outcome.includes('success')) ? 'var(--go-color)' : 'var(--stop-color)';
-        if(outcome === 'stop_success') elements.feedbackArea.style.color = 'var(--go-color)';
-
-        const feedbackTimeout = setTimeout(runTrial, config.feedbackDuration);
-        state.timeouts.push(feedbackTimeout);
+        elements.feedbackArea.style.color = outcome === 'success' ? 'var(--go-color)' : 'var(--stop-color)';
     }
 
-    async function endGame(completed) {
+    async function endGame() {
+        if (state.gameCompleted) return;
+        state.gameCompleted = true; // Game is only ended 'naturally' via this function
         clearTimeouts();
-        window.removeEventListener('keydown', handleKeyPress);
-        state.gameCompleted = completed;
-        logEvent('game_end', { completed: state.gameCompleted });
+        document.removeEventListener('keydown', handleKeyPress);
+
+        logEvent('game_end', { completed: true });
+
+        await sendDataToBackend();
 
         const ssrt = calculateSSRT();
         elements.finalSummary.innerHTML = `
+            <div><div class="label">Stop Signal RT</div><div class="value">${ssrt}ms</div></div>
             <div><div class="label">Go Accuracy</div><div class="value">${getAccuracy(state.goSuccessCount, state.goTotalCount)}%</div></div>
             <div><div class="label">Stop Accuracy</div><div class="value">${getAccuracy(state.stopSuccessCount, state.stopTotalCount)}%</div></div>
-            <div><div class="label">Avg. Go RT</div><div class="value">${state.goRTs.length > 0 ? Math.round(state.goRTs.reduce((a,b)=>a+b,0)/state.goRTs.length) : '-'}ms</div></div>
-            <div><div class="label">Final SSRT</div><div class="value">${ssrt}ms</div></div>
-            <div><div class="label">Stop Signals</div><div class="value">${state.stopTotalCount}</div></div>
             <div><div class="label">Total Trials</div><div class="value">${config.totalTrials}</div></div>
         `;
         elements.finalResultsModal.style.display = 'flex';
-        await sendEventsToBackend();
     }
 
-    async function quitGame(e) {
+    async function handleExit(e) {
         e.preventDefault();
         if (state.isSaving) return;
 
-        const targetUrl = elements.gameBody.dataset.gameListUrl;
-        // If game hasn't started or is already finished and showing results, just navigate
-        if (!state.gameStartTime || elements.finalResultsModal.style.display === 'flex') {
-            window.location.href = targetUrl;
-            return;
+        // If game has started and not finished, save as abandoned
+        if (state.gameStartTime && !state.gameCompleted) {
+            state.gameCompleted = false; // Mark as abandoned
+            await sendDataToBackend();
         }
 
-        // If game is in progress, mark as abandoned, save, then navigate.
-        if (!state.gameCompleted) {
-            await endGame(false);
-        }
-        window.location.href = targetUrl;
+        // Redirect after saving is complete (or if no save was needed)
+        window.location.href = elements.gameBody.dataset.gameListUrl;
     }
 
     // --- UI & HELPERS ---
@@ -312,49 +297,52 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- DATA & BACKEND ---
     function logEvent(type, data = {}) {
-        state.events.push({
-            event_type: type,
-            timestamp_ms: performance.now() - state.gameStartTime,
-            ...data
-        });
+        state.events.push({ event_type: type, timestamp_ms: performance.now() - state.gameStartTime, ...data });
     }
 
-    function sendEventsToBackend() {
-        if (state.isSaving || !state.gameStartTime) return Promise.resolve();
+    async function sendDataToBackend() {
+        if (state.isSaving || !state.gameStartTime) return;
         state.isSaving = true;
+        elements.backToGamesBtn.disabled = true;
+        elements.returnToGamesFinalBtn.disabled = true;
 
-        const duration = Math.round((performance.now() - state.gameStartTime) / 1000);
+        const duration_ms = Math.round(performance.now() - state.gameStartTime);
         const csrfToken = elements.gameBody.dataset.csrfToken;
         const ssrt = calculateSSRT();
 
         const payload = {
-            game_type: 'inhibitory_control',
-            score: ssrt > 0 ? Math.max(0, 500 - ssrt) : 0, // Score inversely related to SSRT
-            duration: duration,
+            game_name: 'stop_signal',
+            score: ssrt > 0 ? Math.max(0, 500 - ssrt) : 0,
+            duration_ms: duration_ms,
             completion_status: state.gameCompleted ? 'completed' : 'abandoned',
-            raw_data: { 
-                events: state.events,
+            events: state.events,
+            game_specific_data: {
                 final_ssrt: ssrt,
                 go_accuracy: getAccuracy(state.goSuccessCount, state.goTotalCount),
                 stop_accuracy: getAccuracy(state.stopSuccessCount, state.stopTotalCount),
-                config: config
+                go_rts: state.goRTs,
+                ssd_values: state.events.filter(e => e.new_ssd).map(e => e.new_ssd)
             }
         };
 
-        return fetch('/games/save-result/', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
-            body: JSON.stringify(payload)
-        })
-        .catch(err => console.error('Error saving game data:', err))
-        .finally(() => { state.isSaving = false; });
+        try {
+            const response = await fetch('{% url "games:save_score" %}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                body: JSON.stringify(payload)
+            });
+            if (!response.ok) throw new Error('Server error during save.');
+            return await response.json();
+        } catch (err) {
+            console.error('Error saving game data:', err);
+        } finally {
+            state.isSaving = false;
+            elements.backToGamesBtn.disabled = false;
+            elements.returnToGamesFinalBtn.disabled = false;
+        }
     }
 
     // --- INITIALIZATION ---
-    elements.startGameBtn.addEventListener('click', startGame);
-    elements.backToGamesBtn.addEventListener('click', quitGame);
-    elements.returnToGamesFinalBtn.addEventListener('click', quitGame);
-
     initGame();
 });
 </script>

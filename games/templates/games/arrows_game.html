@@ -242,6 +242,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const endGame = async () => {
+        if (gameState === 'finished') return;
         gameState = 'finished';
         logEvent('game_end');
         updateDashboard(); // Final update
@@ -255,64 +256,67 @@ document.addEventListener('DOMContentLoaded', () => {
             <div><strong>Overall Accuracy:</strong> ${finalAccuracy}%</div>
             <div><strong>Average Correct RT:</strong> ${finalAvgRt} ms</div>
         `;
+
+        // Save data first to prevent race condition, then show modal.
+        await saveGameResult('completed');
         finalResultsModal.style.display = 'flex';
-        await sendEventsToBackend('completed');
     };
 
     const logEvent = (type, data = {}) => {
         events.push({ event_type: type, timestamp: performance.now() - gameStartTime, ...data });
     };
 
-    const sendEventsToBackend = (completionStatus) => {
-        if (isSaving) return Promise.resolve();
+    async function saveGameResult(completionStatus) {
+        if (isSaving) return;
         isSaving = true;
-        backToGamesBtn.textContent = 'Saving...';
-        backToGamesBtn.style.pointerEvents = 'none';
+        backToGamesBtn.disabled = true;
+        returnToGamesBtn.disabled = true;
 
         const csrfToken = gameBody.dataset.csrfToken;
-        const url = '/games/save-result/';
+        const url = "{% url 'games:save_score' %}";
         const score = results.filter(r => r.correct).length;
         const finalResults = { flanker_effect: calculateFlankerEffect(), ...results };
 
-        return fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
-            body: JSON.stringify({
-                game_type: 'arrows_game',
-                score: score,
-                duration: performance.now() - gameStartTime,
-                raw_data: { events, results: finalResults },
-                completion_status: completionStatus
-            })
-        })
-        .then(response => response.json())
-        .catch(error => console.error('Error saving game data:', error))
-        .finally(() => {
-            isSaving = false;
-            backToGamesBtn.textContent = 'Back to Games';
-            backToGamesBtn.style.pointerEvents = 'auto';
-        });
-    };
+        const payload = {
+            game_name: 'arrows_game',
+            score: score,
+            duration_ms: performance.now() - gameStartTime,
+            events: events,
+            raw_data: { results: finalResults },
+            completion_status: completionStatus
+        };
 
-    const handleExit = async (e) => {
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                body: JSON.stringify(payload)
+            });
+            if (!response.ok) {
+                console.error('Failed to save game data.', await response.text());
+            }
+        } catch (error) {
+            console.error('Error saving game data:', error);
+        } finally {
+            isSaving = false;
+            backToGamesBtn.disabled = false;
+            returnToGamesBtn.disabled = false;
+        }
+    }
+
+    async function handleExit(e) {
         e.preventDefault();
         if (isSaving) return;
+        e.currentTarget.disabled = true;
 
         const url = gameBody.dataset.gameListUrl;
         if (gameState === 'running') {
             gameState = 'abandoned';
             logEvent('game_abandoned');
-            await sendEventsToBackend('abandoned');
-            window.location.href = url;
-        } else if (gameState === 'finished') {
-            // If game is finished, save is already handled by endGame.
-            // We just ensure it's not in the middle of saving before navigating.
-            if (!isSaving) {
-                window.location.href = url;
-            }
-        } else {
-            window.location.href = url;
+            await saveGameResult('abandoned');
         }
+        
+        window.location.href = url;
     };
 
     // Event Listeners

@@ -1,9 +1,21 @@
 {% extends 'base.html' %}
+{% load static %}
 {% block content %}
-<div class="max-w-lg mx-auto mt-4">
-    <button id="back-to-games" class="inline-block mb-4 px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300">← Back to Games</button>
-</div>
+<div class="game-body" data-csrf-token="{{ csrf_token }}" data-game-list-url="{% url 'games:game_list' %}">
+<a href="#" id="back-to-games" class="back-to-games-btn">← Back to Games</a>
 <style>
+    .back-to-games-btn {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        background-color: rgba(55, 65, 81, 0.8);
+        color: var(--text-color);
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        text-decoration: none;
+        font-weight: bold;
+        z-index: 1001;
+    }
     :root {
         --bg-color: #1a1a1a;
         --primary-color: #2c2c2c;
@@ -104,7 +116,7 @@
     .modal-btn:hover { background-color: #0088cc; }
 </style>
 
-<div class="game-container max-w-2xl mx-auto mt-8">
+<div class="game-container max-w-2xl mx-auto">
     <h2 class="text-3xl font-bold mb-4 text-center">Rhythmic Precision Task</h2>
     <div class="dashboard">
         <div class="metric">
@@ -151,7 +163,6 @@
 </div>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-    // Game Elements
     const elements = {
         score: document.getElementById('score'),
         accuracy: document.getElementById('accuracy'),
@@ -163,14 +174,13 @@ document.addEventListener('DOMContentLoaded', () => {
         finalResultsModal: document.getElementById('final-results-modal'),
         startGameBtn: document.getElementById('start-game-btn'),
         backToGamesBtn: document.getElementById('back-to-games'),
-        returnToGamesFinalBtn: document.getElementById('return-to-games-final-btn')
+        returnToGamesFinalBtn: document.getElementById('return-to-games-final-btn'),
+        gameBody: document.querySelector('.game-body')
     };
 
-    // Game Config
+    // Game Config & State
     const GAME_DURATION = 60; // seconds
-    const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-
-    // Game State
+    const TARGET_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     let state = {
         score: 0,
         hits: 0,
@@ -187,25 +197,10 @@ document.addEventListener('DOMContentLoaded', () => {
         eventsLog: []
     };
 
-    function getCookie(name) {
-        let cookieValue = null;
-        if (document.cookie && document.cookie !== '') {
-            const cookies = document.cookie.split(';');
-            for (let i = 0; i < cookies.length; i++) {
-                const cookie = cookies[i].trim();
-                if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                    break;
-                }
-            }
-        }
-        return cookieValue;
-    }
-
     function logEvent(type, data) {
         state.eventsLog.push({
             event_type: type,
-            timestamp: Date.now() - state.gameStartTime,
+            timestamp: state.gameStartTime ? Date.now() - state.gameStartTime : 0,
             time_left: state.timeLeft,
             ...data
         });
@@ -213,43 +208,40 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function updateDashboard() {
         const totalTrials = state.hits + state.misses;
-        const accuracy = totalTrials > 0 ? (state.hits / totalTrials * 100).toFixed(0) : 100;
-        const avgReaction = state.reactionTimes.length > 0 ? (state.reactionTimes.reduce((a, b) => a + b, 0) / state.reactionTimes.length).toFixed(0) : 0;
-        
         elements.score.textContent = state.score;
-        elements.accuracy.textContent = `${accuracy}%`;
-        elements.avgReaction.textContent = `${avgReaction}ms`;
+        elements.accuracy.textContent = `${totalTrials > 0 ? (state.hits / totalTrials * 100).toFixed(0) : 100}%`;
+        elements.avgReaction.textContent = `${state.reactionTimes.length > 0 ? (state.reactionTimes.reduce((a, b) => a + b, 0) / state.reactionTimes.length).toFixed(0) : 0}ms`;
         elements.timer.textContent = state.timeLeft;
     }
 
     function generateTrial() {
-        if (state.timeLeft <= 0) return;
-        state.isResponding = false;
-        state.currentTarget = ALPHABET[Math.floor(Math.random() * ALPHABET.length)];
+        if (state.isResponding) return;
+        state.isResponding = true;
+
+        state.currentTarget = TARGET_ALPHABET[Math.floor(Math.random() * TARGET_ALPHABET.length)];
         elements.targetLetter.textContent = state.currentTarget;
         elements.targetLetter.style.color = 'var(--text-color)';
         state.trialStartTime = Date.now();
-        logEvent('trial_start', { target_letter: state.currentTarget });
     }
 
     function handleKeyPress(e) {
-        if (state.isResponding || state.timeLeft <= 0 || !state.currentTarget) return;
-        
-        const key = e.key.toUpperCase();
-        if (ALPHABET.includes(key)) {
-            state.isResponding = true;
+        if (!state.isResponding || !state.currentTarget) return;
+
+        const pressedKey = e.key.toUpperCase();
+        if (pressedKey.length === 1 && pressedKey >= 'A' && pressedKey <= 'Z') {
             const reactionTime = Date.now() - state.trialStartTime;
-            const isCorrect = key === state.currentTarget;
+            state.isResponding = false;
 
-            logEvent('response', { key_pressed: key, is_correct: isCorrect, reaction_time: reactionTime });
-
-            if (isCorrect) {
+            if (pressedKey === state.currentTarget) {
                 state.hits++;
+                state.score += 10;
                 state.reactionTimes.push(reactionTime);
-                state.score += 100 + Math.max(0, 50 - Math.floor(reactionTime / 100));
+                logEvent('hit', { letter: pressedKey, reaction_time: reactionTime });
                 showFeedback(true);
             } else {
                 state.misses++;
+                state.score -= 5;
+                logEvent('miss', { pressed_key: pressedKey, target: state.currentTarget });
                 showFeedback(false);
             }
             
@@ -284,6 +276,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function endGame() {
+        if (state.gameCompleted) return;
         state.gameCompleted = true;
         clearInterval(state.gameInterval);
         window.removeEventListener('keydown', handleKeyPress);
@@ -296,71 +289,68 @@ document.addEventListener('DOMContentLoaded', () => {
 
         document.getElementById('final-score').textContent = `Your score: ${state.score}`;
         document.getElementById('final-summary').textContent = `Accuracy: ${finalAccuracy}% | Avg. Reaction: ${finalAvgReaction}ms`;
+        
+        // Save data first to prevent race condition, then show modal.
+        await saveGameResult();
         elements.finalResultsModal.style.display = 'flex';
-
-        await saveGameResult();
     }
 
-    async function quitGame() {
+    async function handleExit(e) {
+        e.preventDefault();
         if (state.isSaving) return;
-        state.gameCompleted = false;
-        clearInterval(state.gameInterval);
-        window.removeEventListener('keydown', handleKeyPress);
-        logEvent('game_quit', { final_score: state.score });
-        await saveGameResult();
-        window.location.href = '/games/';
+
+        if (state.gameStartTime && !state.gameCompleted) {
+            state.gameCompleted = false; // Mark as abandoned
+            if(state.gameInterval) clearInterval(state.gameInterval);
+            window.removeEventListener('keydown', handleKeyPress);
+            logEvent('game_quit', { final_score: state.score });
+            await saveGameResult();
+        }
+
+        window.location.href = elements.gameBody.dataset.gameListUrl;
     }
 
-    function saveGameResult() {
-        if (state.isSaving) return Promise.resolve();
+    async function saveGameResult() {
+        if (state.isSaving) return;
         state.isSaving = true;
 
-        const duration = (Date.now() - state.gameStartTime) / 1000;
+        const duration_ms = (state.gameStartTime) ? (Date.now() - state.gameStartTime) : 0;
         const payload = {
-            game_type: 'keypresses',
+            game_name: 'keypresses',
             score: state.score,
-            duration: duration.toFixed(2),
+            duration_ms: duration_ms,
             completion_status: state.gameCompleted ? 'completed' : 'abandoned',
+            events: state.eventsLog,
             raw_data: {
                 hits: state.hits,
                 misses: state.misses,
-                reaction_times: state.reactionTimes,
-                events: state.eventsLog
+                reaction_times: state.reactionTimes
             }
         };
 
-        return fetch('/games/save-result/', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken')
-            },
-            body: JSON.stringify(payload)
-        }).then(res => {
-            if (!res.ok) console.error('Failed to save game data.');
-            return res.json();
-        }).catch(error => console.error('Error saving game data:', error))
-        .finally(() => {
+        try {
+            const response = await fetch("{% url 'games:save_score' %}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': elements.gameBody.dataset.csrfToken
+                },
+                body: JSON.stringify(payload)
+            });
+            if (!response.ok) {
+                console.error('Failed to save game data.', await response.text());
+            }
+        } catch (error) {
+            console.error('Error saving game data:', error);
+        } finally {
             state.isSaving = false;
-        });
+        }
     }
 
     // Event Listeners
     elements.startGameBtn.addEventListener('click', startGame);
-    elements.backToGamesBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        if (state.timeLeft > 0 && state.timeLeft < GAME_DURATION) {
-            quitGame();
-        } else {
-            window.location.href = '/games/';
-        }
-    });
-
-    elements.returnToGamesFinalBtn.addEventListener('click', () => {
-        if (!state.isSaving) {
-            window.location.href = '/games/';
-        }
-    });
+    elements.backToGamesBtn.addEventListener('click', handleExit);
+    elements.returnToGamesFinalBtn.addEventListener('click', handleExit);
 });
 </script>
 {% endblock %}

@@ -128,8 +128,8 @@
     }
 </style>
 
-<div class="game-body">
-    <a href="/games/" id="back-to-games">← Back to Games</a>
+<div class="game-body" data-csrf-token="{{ csrf_token }}" data-game-list-url="{% url 'games:game_list' %}">
+    <a href="#" id="back-to-games">← Back to Games</a>
 
     <div class="game-container">
         <div class="game-header">
@@ -199,6 +199,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const returnToGamesFinalBtn = document.getElementById('return-to-games-final-btn');
     const startGameBtn = document.getElementById('start-game-btn');
     const backToGamesBtn = document.getElementById('back-to-games');
+    const gameBody = document.querySelector('.game-body');
 
     // Game Configuration
     const GAME_DURATION = 90000; // 90 seconds
@@ -323,6 +324,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function endGame() {
+        if (gameCompleted) return;
         gameCompleted = true;
         clearTimeout(gameTimer);
         clearInterval(spawnInterval);
@@ -335,73 +337,75 @@ document.addEventListener('DOMContentLoaded', () => {
         const accuracy = totalPresses > 0 ? ((hits / totalPresses) * 100).toFixed(1) : 100;
         const avgReaction = reactionTimes.length > 0 ? (reactionTimes.reduce((a, b) => a + b, 0) / reactionTimes.length).toFixed(0) : 'N/A';
         document.getElementById('final-summary').textContent = `You reached level ${level} with ${accuracy}% accuracy and an average reaction time of ${avgReaction} ms.`;
-        finalResultsModal.style.display = 'flex';
-
-        await saveGameResult();
-    }
-
-    async function quitGame() {
-        if (isSaving) return;
-        if (gameTimer) {
-            clearTimeout(gameTimer);
-            clearInterval(spawnInterval);
-        }
-        document.removeEventListener('keydown', handleKeyPress);
-        logEvent('game_quit', { final_score: score, final_level: level });
         
+        // Save data first to prevent race condition, then show modal.
         await saveGameResult();
-        window.location.href = '/games/';
+        finalResultsModal.style.display = 'flex';
     }
 
-    function saveGameResult() {
-        if(isSaving) return Promise.resolve();
+    async function handleExit(e) {
+        e.preventDefault();
+        if (isSaving) return;
+
+        // If the game has started but not finished, save it as abandoned.
+        if (gameStartTime && !gameCompleted) {
+            gameCompleted = false; // Explicitly set as abandoned
+            if (gameTimer) { // Stop the game timers
+                clearTimeout(gameTimer);
+                clearInterval(spawnInterval);
+            }
+            document.removeEventListener('keydown', handleKeyPress);
+            logEvent('game_quit', { final_score: score, final_level: level });
+            await saveGameResult();
+        }
+
+        // Always redirect after handling the save operation.
+        window.location.href = gameBody.dataset.gameListUrl;
+    }
+
+    async function saveGameResult() {
+        if(isSaving) return;
         isSaving = true;
 
-        const duration = (Date.now() - gameStartTime) / 1000;
+        const duration_ms = Date.now() - gameStartTime;
         const payload = {
-            game_type: 'letters',
+            game_name: 'letters',
             score: score,
-            duration: duration.toFixed(2),
+            duration_ms: duration_ms,
             completion_status: gameCompleted ? 'completed' : 'abandoned',
+            events: eventsLog,
             raw_data: {
                 level: level,
                 hits: hits,
                 misses: misses,
                 accuracy: totalPresses > 0 ? (hits / totalPresses) : 1,
-                reaction_times: reactionTimes,
-                events: eventsLog
+                reaction_times: reactionTimes
             }
         };
 
-        return fetch('/games/save-result/', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken')
-            },
-            body: JSON.stringify(payload)
-        }).then(res => {
-            if (!res.ok) console.error('Failed to save game data.');
-            return res.json();
-        }).catch(error => console.error('Error saving game data:', error))
-        .finally(() => {
+        try {
+            const response = await fetch("{% url 'games:save_score' %}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': gameBody.dataset.csrfToken
+                },
+                body: JSON.stringify(payload)
+            });
+            if (!response.ok) {
+                console.error('Failed to save game data.', await response.text());
+            }
+        } catch (error) {
+            console.error('Error saving game data:', error);
+        } finally {
             isSaving = false;
-        });
+        }
     }
 
     // Event Listeners
     startGameBtn.addEventListener('click', startGame);
-    
-    backToGamesBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        quitGame();
-    });
-
-    returnToGamesFinalBtn.addEventListener('click', () => {
-        if (!isSaving) {
-            window.location.href = '/games/';
-        }
-    });
+    backToGamesBtn.addEventListener('click', handleExit);
+    returnToGamesFinalBtn.addEventListener('click', handleExit);
 });
 </script>
 {% endblock %}

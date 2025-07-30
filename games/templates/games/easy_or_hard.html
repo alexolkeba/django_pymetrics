@@ -96,7 +96,7 @@
     .modal-btn:hover { background-color: #0088cc; }
 </style>
 
-<div class="game-container max-w-2xl mx-auto mt-8">
+<div class="game-container max-w-2xl mx-auto mt-8" data-csrf-token="{{ csrf_token }}" data-game-list-url="{% url 'games:game_list' %}">
     <h2 class="text-3xl font-bold mb-4 text-center">Cognitive Effort Task</h2>
     <div class="dashboard">
         <div class="metric">
@@ -134,8 +134,10 @@
 <div id="instruction-modal" class="modal">
     <div class="modal-content">
         <h2>Cognitive Effort Task</h2>
-        <p>In each round, you will choose between an easy task with a small, guaranteed reward, and a hard task with a larger, potential reward.</p>
-        <p>The hard task requires you to solve a simple math problem within a time limit.</p>
+        <p style="text-align: left; margin-bottom: 1.5rem;">
+            In each round, choose between an <strong>easy task</strong> (small, guaranteed reward) and a <strong>hard task</strong> (larger, potential reward). The hard task requires solving a simple math problem against the clock.<br><br>
+            This game measures how you weigh effort against reward. Your choices will help us understand your decision-making style.
+        </p>
         <button id="start-game-btn" class="modal-btn">Start Game</button>
     </div>
 </div>
@@ -172,7 +174,8 @@ document.addEventListener('DOMContentLoaded', () => {
         finalResultsModal: document.getElementById('final-results-modal'),
         startGameBtn: document.getElementById('start-game-btn'),
         backToGamesBtn: document.getElementById('back-to-games'),
-        returnToGamesFinalBtn: document.getElementById('return-to-games-final-btn')
+        returnToGamesFinalBtn: document.getElementById('return-to-games-final-btn'),
+        gameContainer: document.querySelector('.game-container')
     };
 
     // State
@@ -190,20 +193,7 @@ document.addEventListener('DOMContentLoaded', () => {
         eventsLog: []
     };
 
-    function getCookie(name) {
-        let cookieValue = null;
-        if (document.cookie && document.cookie !== '') {
-            const cookies = document.cookie.split(';');
-            for (let i = 0; i < cookies.length; i++) {
-                const cookie = cookies[i].trim();
-                if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                    break;
-                }
-            }
-        }
-        return cookieValue;
-    }
+
 
     function logEvent(type, data) {
         state.eventsLog.push({ event_type: type, round: state.currentRound + 1, timestamp: Date.now() - state.gameStartTime, ...data });
@@ -292,43 +282,61 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function endGame() {
+        if (state.gameCompleted) return;
         state.gameCompleted = true;
         logEvent('game_end', { final_score: state.score, hard_tasks_chosen: state.hardTasksChosen });
         document.getElementById('final-score').textContent = `Your final score: ${state.score}`;
         document.getElementById('final-summary').textContent = `You chose the hard task ${state.hardTasksChosen} times.`;
+        // Save data first to prevent race condition, then show modal.
+        await saveGameResult();
         elements.finalResultsModal.style.display = 'flex';
-        await saveGameResult();
     }
 
-    async function quitGame() {
+    async function handleExit(e) {
+        e.preventDefault();
         if (state.isSaving) return;
-        state.gameCompleted = false;
-        logEvent('game_quit', { final_score: state.score });
-        await saveGameResult();
-        window.location.href = '/games/';
+
+        if (state.gameStartTime && !state.gameCompleted) {
+            clearTimeout(state.taskTimer);
+            state.gameCompleted = false; // Mark as abandoned
+            logEvent('game_quit', { final_score: state.score });
+            await saveGameResult();
+        }
+
+        window.location.href = elements.gameContainer.dataset.gameListUrl;
     }
 
-    function saveGameResult() {
-        if (state.isSaving) return Promise.resolve();
+    async function saveGameResult() {
+        if (state.isSaving) return;
         state.isSaving = true;
 
-        const duration = (Date.now() - state.gameStartTime) / 1000;
+        const duration_ms = (state.gameStartTime) ? (Date.now() - state.gameStartTime) : 0;
         const payload = {
-            game_type: 'easy_or_hard',
+            game_name: 'easy_or_hard',
             score: state.score,
-            duration: duration.toFixed(2),
+            duration_ms: duration_ms,
             completion_status: state.gameCompleted ? 'completed' : 'abandoned',
-            raw_data: { hard_tasks_chosen: state.hardTasksChosen, total_rounds: state.currentRound, events: state.eventsLog }
+            events: state.eventsLog,
+            raw_data: { hard_tasks_chosen: state.hardTasksChosen, total_rounds: state.currentRound }
         };
-        return fetch('/games/save-result/', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
-            body: JSON.stringify(payload)
-        }).then(res => res.json())
-        .catch(error => console.error('Error saving game data:', error))
-        .finally(() => {
+
+        try {
+            const response = await fetch("{% url 'games:save_score' %}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': elements.gameContainer.dataset.csrfToken
+                },
+                body: JSON.stringify(payload)
+            });
+            if (!response.ok) {
+                console.error('Failed to save game data.', await response.text());
+            }
+        } catch (error) {
+            console.error('Error saving game data:', error);
+        } finally {
             state.isSaving = false;
-        });
+        }
     }
 
     // Event Listeners
@@ -337,20 +345,8 @@ document.addEventListener('DOMContentLoaded', () => {
     elements.hardChoice.addEventListener('click', handleHardChoice);
     elements.submitAnswerBtn.addEventListener('click', () => handleSubmitAnswer(false));
     elements.mathInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') handleSubmitAnswer(false); });
-    elements.backToGamesBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        if (state.currentRound > 0 && state.currentRound < TOTAL_ROUNDS) {
-            quitGame();
-        } else {
-            window.location.href = '/games/';
-        }
-    });
-
-    elements.returnToGamesFinalBtn.addEventListener('click', () => {
-        if (!state.isSaving) {
-            window.location.href = '/games/';
-        }
-    });
+    elements.backToGamesBtn.addEventListener('click', handleExit);
+    elements.returnToGamesFinalBtn.addEventListener('click', handleExit);
 });
 </script>
 {% endblock %}

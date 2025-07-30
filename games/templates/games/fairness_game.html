@@ -221,11 +221,10 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const endGame = async (completed) => {
+        if (state.gameCompleted) return;
         state.gameCompleted = completed;
-        logEvent('game_end', { completed });
-        displayFinalResults();
-        finalResultsModal.style.display = 'flex';
-        await sendDataToBackend();
+        logEvent(completed ? 'game_completed' : 'game_abandoned');
+        await displayFinalResults(); // Now awaits the results display and save
     };
 
     // --- UI & Helpers ---
@@ -240,12 +239,15 @@ document.addEventListener('DOMContentLoaded', () => {
         if (viewToShow) viewToShow.style.display = 'block';
     };
 
-    const displayFinalResults = () => {
+    const displayFinalResults = async () => {
+        // Save data first to prevent race conditions
+        await sendDataToBackend();
+
         const offersMade = state.events.filter(e => e.type === 'offer_made').map(e => e.offer);
         const offersReceived = state.events.filter(e => e.type === 'offer_received').map(e => e.offer);
         const acceptedCount = state.events.filter(e => e.type === 'response_made' && e.response === 'accepted').length;
         const rejectedCount = state.events.filter(e => e.type === 'response_made' && e.response === 'rejected').length;
-        
+
         document.getElementById('final-summary').innerHTML = `
             <div><strong>Total Winnings:</strong></div><div style="color: var(--success-color); font-weight: bold;">$${state.totalWinnings}</div>
             <div><strong>Avg. Offer Made:</strong></div><div>$${(offersMade.reduce((a, b) => a + b, 0) / (offersMade.length || 1)).toFixed(2)}</div>
@@ -253,6 +255,8 @@ document.addEventListener('DOMContentLoaded', () => {
             <div><strong>Offers Accepted:</strong></div><div>${acceptedCount}</div>
             <div><strong>Offers Rejected:</strong></div><div>${rejectedCount}</div>
         `;
+        // Show modal only after data is saved
+        finalResultsModal.style.display = 'flex';
     };
 
     // --- Data Handling ---

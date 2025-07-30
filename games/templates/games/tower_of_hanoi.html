@@ -111,17 +111,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- GAME LOGIC ---
     function initGame() {
+        elements.instructionModal.style.display = 'flex';
+        elements.finalResultsModal.style.display = 'none';
+
+        // Clear any previous game state
+        gameCompleted = false;
+        isSaving = false;
+        gameStartTime = null;
+        events = [];
+        currentLevel = START_LEVEL;
+        moves = 0;
+        clearInterval(timerInterval);
+
+        // Setup event listeners
         elements.startGameBtn.addEventListener('click', startGame);
-        elements.backToGamesBtn.addEventListener('click', (e) => quitGame(e));
-        elements.returnToGamesFinalBtn.addEventListener('click', () => {
-            // The save operation is triggered by endGame and runs in the background.
-            // We just need to make sure we don't redirect while it's in progress.
-            if (!isSaving) {
-                window.location.href = elements.gameBody.dataset.gameListUrl;
-            }
-            // If saving is in progress, the click does nothing, preventing a race condition.
-            // The user can click again once saving is complete.
-        });
+        elements.backToGamesBtn.addEventListener('click', (e) => handleExit(e, false));
+        elements.returnToGamesFinalBtn.addEventListener('click', (e) => handleExit(e, true));
     }
 
     function startGame() {
@@ -202,31 +207,44 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function endGame(completed) {
-        if (isSaving) return;
+        if (isSaving || !gameStartTime) return;
         gameCompleted = completed;
         clearInterval(timerInterval);
         logEvent('game_end', { final_level: currentLevel, total_moves: moves, completed: gameCompleted });
 
+        // Save data first to prevent race conditions.
+        await sendDataToBackend();
+
         const totalTime = Math.round((performance.now() - gameStartTime) / 1000);
-        elements.finalSummary.innerHTML = `
+        const summaryHtml = `
             <span>You reached <strong>Level ${currentLevel}</strong></span>
             <span>Total Moves: <strong>${moves}</strong></span>
             <span>Total Time: <strong>${totalTime}s</strong></span>
         `;
+        elements.finalSummary.innerHTML = summaryHtml;
         elements.finalResultsModal.style.display = 'flex';
-        await sendEventsToBackend();
     }
 
-    async function quitGame(e) {
+    // This is the single, reliable exit point for the game.
+    async function handleExit(e, isFinalExit) {
         e.preventDefault();
         if (isSaving) return;
 
-        const targetUrl = elements.gameBody.dataset.gameListUrl;
-        if (!gameCompleted && gameStartTime) {
-            // endGame is now async and handles the save
-            await endGame(false);
+        // If the game has started but not finished, save it as abandoned.
+        // The final exit button implies completion, so we don't mark it as abandoned.
+        if (gameStartTime && !gameCompleted && !isFinalExit) {
+            logEvent('game_quit', { level: currentLevel });
+            await sendDataToBackend();
+        } else if (gameCompleted) {
+            // If the game is complete, the data is already saved by endGame.
+            // We just need to ensure we wait if a save is in progress.
+            if (isSaving) {
+                await new Promise(resolve => setTimeout(resolve, 100)); // simple wait
+            }
         }
-        window.location.href = targetUrl;
+
+        // Always redirect after handling the save operation.
+        window.location.href = elements.gameBody.dataset.gameListUrl;
     }
 
     // --- UI & FEEDBACK ---
@@ -271,29 +289,44 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function sendEventsToBackend() {
-        if (isSaving || !gameStartTime) return Promise.resolve();
+    async function sendDataToBackend() {
+        if (isSaving || !gameStartTime) return;
         isSaving = true;
+        elements.backToGamesBtn.disabled = true;
+        elements.returnToGamesFinalBtn.disabled = true;
 
-        const duration = Math.round((performance.now() - gameStartTime) / 1000);
+        const duration_ms = Math.round(performance.now() - gameStartTime);
         const csrfToken = elements.gameBody.dataset.csrfToken;
-        const score = (currentLevel * 1000) - (moves * 10) - duration;
+        const score = (currentLevel * 1000) - (moves * 10) - Math.round(duration_ms / 1000);
 
         const payload = {
-            game_type: 'progressive_planning',
+            game_name: 'tower_of_hanoi',
             score: Math.max(0, score),
-            duration: duration,
+            duration_ms: duration_ms,
             completion_status: gameCompleted ? 'completed' : 'abandoned',
-            raw_data: { events: events, final_level: currentLevel }
+            events: events,
+            game_specific_data: { 
+                final_level: currentLevel,
+                total_moves: moves,
+                optimal_moves: Math.pow(2, currentLevel) - 1
+            }
         };
 
-        return fetch('/games/save-result/', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
-            body: JSON.stringify(payload)
-        })
-        .catch(err => console.error('Error saving game data:', err))
-        .finally(() => { isSaving = false; });
+        try {
+            const response = await fetch('{% url "games:save_score" %}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                body: JSON.stringify(payload)
+            });
+            if (!response.ok) throw new Error('Server error during save.');
+            return await response.json();
+        } catch (err) {
+            console.error('Error saving game data:', err);
+        } finally {
+            isSaving = false;
+            elements.backToGamesBtn.disabled = false;
+            elements.returnToGamesFinalBtn.disabled = false;
+        }
     }
 
     // --- INITIALIZATION ---

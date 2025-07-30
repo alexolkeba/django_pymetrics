@@ -541,13 +541,12 @@ function sendEventsToBackend() {
         investmentDecisions.reduce((sum, e) => sum + e.player_generosity, 0) / investmentDecisions.length : 0;
     
     const gameData = {
-        game_type: 'money_exchange_1',
-        score: Math.max(0, totalEarned), // Use total earned as score
-        duration: gameDuration,
-        decisions: investmentDecisions,
-        reaction_times: [], // Could add decision times in future
+        game_name: 'money_exchange_1',
+        score: Math.max(0, totalEarned),
+        duration_ms: gameDuration,
+        completion_status: completionStatus,
+        events: events, 
         raw_data: {
-            events: events,
             partner_personality: partnerPersonality,
             partner_history: partnerHistory,
             final_metrics: {
@@ -561,11 +560,10 @@ function sendEventsToBackend() {
                 achievements_unlocked: Array.from(achievements),
                 partner_final_mood: partnerMood
             }
-        },
-        completion_status: completionStatus
+        }
     };
-    
-    return fetch('/games/save-result/', {
+
+    return fetch("{% url 'games:save_score' %}", {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',

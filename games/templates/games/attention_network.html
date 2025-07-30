@@ -550,6 +550,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const endGame = async () => {
+        if (gameState === 'finished') return;
         gameState = 'finished';
         logEvent('game_end');
         const scores = calculateNetworkScores();
@@ -564,66 +565,66 @@ document.addEventListener('DOMContentLoaded', () => {
              <div>Orienting: <strong style="color: var(--primary-color)">${scores.orienting} ms</strong></div>
              <div>Executive Control: <strong style="color: var(--primary-color)">${scores.executive} ms</strong></div>`;
 
+        // Save data first to prevent race condition, then show modal.
+        await saveGameResult();
         finalResultsModal.style.display = 'flex';
-        await sendEventsToBackend();
     };
 
-    const sendEventsToBackend = () => {
-        if (isSaving) return Promise.resolve();
+    async function handleExit(e) {
+        e.preventDefault();
+        if (isSaving) return;
+        e.currentTarget.disabled = true;
+
+        if (gameState === 'running') {
+            logEvent('game_abandoned');
+            await saveGameResult();
+        }
+        
+        window.location.href = gameListUrl;
+    }
+
+    async function saveGameResult() {
+        if (isSaving) return;
         isSaving = true;
 
         const isCompleted = gameState === 'finished';
         const completionStatus = isCompleted ? 'completed' : 'abandoned';
         const totalDuration = performance.now() - gameStartTime;
         const score = results.filter(r => r.correct).length;
+        const scores = calculateNetworkScores();
 
-        logEvent('save_attempt', { status: completionStatus });
+        const payload = {
+            game_name: 'attention_network',
+            score: score,
+            duration_ms: Math.round(totalDuration),
+            completion_status: completionStatus,
+            events: events,
+            raw_data: { results, network_scores: scores },
+        };
 
-        return fetch('/games/save-result/', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
-            body: JSON.stringify({
-                game_type: 'attention_network',
-                score: score,
-                duration: Math.round(totalDuration),
-                raw_data: { events, results },
-                completion_status: completionStatus
-            })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (!data.success) console.error('Failed to save game data:', data.error);
-        })
-        .catch(error => console.error('Error saving game data:', error))
-        .finally(() => { isSaving = false; });
-    };
-
-    const navigateToGamesList = () => {
-        window.location.href = gameListUrl;
-    };
+        try {
+            const response = await fetch("{% url 'games:save_score' %}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify(payload)
+            });
+            if (!response.ok) {
+                console.error('Failed to save game data.', await response.text());
+            }
+        } catch (error) {
+            console.error('Error saving game data:', error);
+        } finally {
+            isSaving = false;
+        }
+    }
 
     // --- EVENT LISTENERS ---
     startGameBtn.addEventListener('click', startGame);
-
-    backToGamesBtn.addEventListener('click', async (e) => {
-        e.preventDefault();
-        if (isSaving) return;
-        e.target.style.pointerEvents = 'none';
-
-        if (gameState === 'running') {
-            await sendEventsToBackend();
-            navigateToGamesList();
-        } else {
-            navigateToGamesList();
-        }
-    });
-
-    returnToGamesBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        if (!isSaving) {
-            navigateToGamesList();
-        }
-    });
+    backToGamesBtn.addEventListener('click', handleExit);
+    returnToGamesBtn.addEventListener('click', handleExit);
 });
 </script>
 {% endblock %}

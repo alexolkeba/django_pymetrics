@@ -96,7 +96,7 @@
     .modal-btn:hover { background-color: #0088cc; }
 </style>
 
-<div class="game-container max-w-3xl mx-auto mt-8">
+<div class="game-container max-w-3xl mx-auto mt-8" data-csrf-token="{{ csrf_token }}" data-game-list-url="{% url 'games:game_list' %}">
     <h2 class="text-3xl font-bold mb-4 text-center">Strategic Investment Task</h2>
     <div class="dashboard">
         <div class="metric">
@@ -175,6 +175,7 @@ const decksContainer = document.getElementById('decks-container');
 const instructionModal = document.getElementById('instruction-modal');
 const finalResultsModal = document.getElementById('final-results-modal');
 const returnToGamesFinalBtn = document.getElementById('return-to-games-final-btn');
+const gameContainer = document.querySelector('.game-container');
 
 function logEvent(type, data) {
     const event = {
@@ -254,6 +255,7 @@ function showFeedback(gain, loss) {
 }
 
 async function endGame() {
+    if (gameCompleted) return;
     gameCompleted = true;
     decksLocked = true;
     logEvent('game_end', { final_score: score });
@@ -263,8 +265,10 @@ async function endGame() {
         ? `You made a profit of $${score - STARTING_SCORE}. Well done!`
         : `You ended with a loss of $${STARTING_SCORE - score}.`;
     document.getElementById('final-summary').textContent = summary;
+    
+    // Save data first to prevent race condition, then show modal.
+    await saveGameResult();
     finalResultsModal.style.display = 'flex';
-    await sendEventsToBackend();
 }
 
 function startGame() {
@@ -275,72 +279,58 @@ function startGame() {
     updateDashboard();
 }
 
-function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
-            }
-        }
+async function handleExit(e) {
+    e.preventDefault();
+    if (isSaving) return;
+
+    if (currentRound > 1 && !gameCompleted) {
+        logEvent('game_abandoned', { final_score: score });
+        await saveGameResult();
     }
-    return cookieValue;
+
+    window.location.href = gameContainer.dataset.gameListUrl;
 }
 
-function sendEventsToBackend() {
-    if (isSaving) return Promise.resolve();
+async function saveGameResult() {
+    if (isSaving) return;
     isSaving = true;
-    const completionStatus = gameCompleted ? 'completed' : 'abandoned';
-    const totalDuration = events.length > 1 ? new Date(events[events.length - 1].timestamp) - new Date(events[0].timestamp) : 0;
 
-    return fetch('/games/save-result/', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': getCookie('csrftoken')
-        },
-        body: JSON.stringify({
-            game_type: 'cards_game',
-            score: score,
-            duration: totalDuration,
-            raw_data: { events: events },
-            completion_status: completionStatus
-        })
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (!data.success) console.error('Error saving session: ' + data.error);
-        return data;
-    })
-    .finally(() => {
+    const completionStatus = gameCompleted ? 'completed' : 'abandoned';
+    const gameStartTime = events.find(e => e.event_type === 'game_start')?.timestamp || Date.now();
+    const duration_ms = Date.now() - gameStartTime;
+
+    const payload = {
+        game_name: 'cards_game',
+        score: score,
+        duration_ms: duration_ms,
+        completion_status: completionStatus,
+        events: events,
+        raw_data: {}
+    };
+
+    try {
+        const response = await fetch("{% url 'games:save_score' %}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': gameContainer.dataset.csrfToken
+            },
+            body: JSON.stringify(payload)
+        });
+        if (!response.ok) {
+            console.error('Failed to save game data.', await response.text());
+        }
+    } catch (error) {
+        console.error('Error saving game data:', error);
+    } finally {
         isSaving = false;
-    });
+    }
 }
 
 // Event Listeners
 document.getElementById('start-game-btn').addEventListener('click', startGame);
 decksContainer.addEventListener('click', handleDeckPick);
-
-returnToGamesFinalBtn.addEventListener('click', () => {
-    if (!isSaving) {
-        window.location.href = '/games/';
-    }
-});
-
-document.getElementById('back-to-games').addEventListener('click', async function() {
-    if (isSaving) return;
-    this.disabled = true;
-
-    if (!gameCompleted) {
-        logEvent('game_abandoned', { final_score: score });
-        await sendEventsToBackend();
-        window.location.href = '/games/';
-    } else {
-        window.location.href = '/games/';
-    }
-});
+returnToGamesFinalBtn.addEventListener('click', handleExit);
+document.getElementById('back-to-games').addEventListener('click', handleExit);
 </script>
 {% endblock %}

@@ -264,12 +264,16 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const endGame = async () => {
+        if (gameCompleted) return; // Prevent multiple calls
         gameState = 'finished';
         gameCompleted = true;
         events.push({ event_type: 'game_end', timestamp: Date.now() - gameStartTime });
+
+        // Ensure data is saved before showing final results and allowing exit.
+        await sendDataToBackend();
+
         displayFinalResults();
         showModal(finalResultsModal);
-        await sendDataToBackend();
     };
 
     const displayFinalResults = () => {
@@ -287,17 +291,17 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
     };
 
-    const sendDataToBackend = () => {
-        if (isSaving) return Promise.resolve();
+    async function sendDataToBackend() {
+        if (isSaving || !gameStartTime) return;
         isSaving = true;
+
         const completionStatus = gameCompleted ? 'completed' : 'abandoned';
         const totalDuration = Date.now() - gameStartTime;
         const score = correctCount * 10 - incorrectCount * 5; // Example scoring
-
         const avgCongruentRT = congruentRTs.length > 0 ? Math.round(congruentRTs.reduce((a, b) => a + b, 0) / congruentRTs.length) : 0;
         const avgIncongruentRT = incongruentRTs.length > 0 ? Math.round(incongruentRTs.reduce((a, b) => a + b, 0) / incongruentRTs.length) : 0;
 
-        const data = {
+        const payload = {
             game_name: 'stroop_test',
             score: Math.max(0, score),
             duration_ms: totalDuration,
@@ -314,17 +318,22 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
 
-        return fetch('{% url "games:save_score" %}', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': '{{ csrf_token }}'
-            },
-            body: JSON.stringify(data)
-        }).finally(() => {
+        try {
+            const response = await fetch('{% url "games:save_score" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify(payload)
+            });
+            if (!response.ok) throw new Error('Server error during save.');
+        } catch (err) {
+            console.error('Error saving game data:', err);
+        } finally {
             isSaving = false;
-        });
-    };
+        }
+    }
 
     // --- EVENT LISTENERS ---
     startGameBtn.addEventListener('click', startGame);

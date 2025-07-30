@@ -210,11 +210,13 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const endGame = async (completed) => {
+        if (state.gameCompleted) return;
         state.gameCompleted = completed;
-        logEvent('game_end', { completed });
+        logEvent(completed ? 'game_completed' : 'game_abandoned');
         displayFinalResults();
-        finalResultsModal.style.display = 'flex';
+        // Save data first to prevent race condition, then show modal.
         await sendDataToBackend();
+        finalResultsModal.style.display = 'flex';
     };
 
     // --- UI & Helpers ---

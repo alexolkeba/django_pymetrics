@@ -1096,11 +1096,10 @@ Everything is working correctly now! The assessment progress page properly refle
 
 ==============================
 
- I will replace the placeholder comment // JS logic will be added in the next step with the full script.
+Confirmed. The 
+games/urls.py
+ file clearly shows the correct endpoint is save-score/. The frontend for "Money Exchange Game #2" is definitely pointing to the wrong URL.
 
-python manage.py migrate games                                                                          
-SystemCheckError: System check identified some issues:
-
-ERRORS:
-games.DynamicDifficultyConfig.game_type: (fields.E005) 'choices' must be a mapping of actual values to human readable names or an iterable containing (actual value, human readable name) tuples.
-games.GameResult.game_type: (fields.E005) 'choices' must be a mapping of actual values to human readable names or an iterable containing (actual value, human readable name) tuples. 
+I will now locate the incorrect fetch call in 
+money_exchange_2.html
+ and replace the old /games/save-result/ URL with the correct {% url "games:save_score" %} endpoint. This will resolve the 404 error and allow the game to save its results correctly.

@@ -134,8 +134,8 @@ document.addEventListener('DOMContentLoaded', () => {
             elements.sendAmountValue.textContent = `$${e.target.value}`;
         });
         elements.sendBtn.addEventListener('click', playRound);
-        elements.backToGamesBtn.addEventListener('click', (e) => quitGame(e));
-        elements.returnToGamesFinalBtn.addEventListener('click', (e) => quitGame(e));
+        elements.backToGamesBtn.addEventListener('click', handleExit);
+        elements.returnToGamesFinalBtn.addEventListener('click', handleExit);
     }
 
     function startGame() {
@@ -184,17 +184,17 @@ document.addEventListener('DOMContentLoaded', () => {
         showFeedback(amountSent, amountReturned, profit);
 
         if (currentRound >= TOTAL_ROUNDS) {
-            setTimeout(() => endGame(true), 2000);
+            setTimeout(endGame, 2000);
         } else {
             setTimeout(startNextRound, 2000);
         }
     }
 
-    async function endGame(completed) {
-        if (isSaving) return;
-        gameCompleted = completed;
-        logEvent('game_end', { final_balance: balance, completed: gameCompleted });
-        
+    async function endGame() {
+        if (gameCompleted) return; // Prevent multiple calls
+        gameCompleted = true;
+        logEvent('game_end', { final_balance: balance, completed: true });
+
         const summaryHtml = `
             <span><strong>Final Balance:</strong> <span style="color: var(--primary-color);">$${balance}</span></span>
             <span><strong>Partner Personality:</strong> <span style="color: var(--primary-color);">${partner.personality}</span></span>
@@ -202,20 +202,25 @@ document.addEventListener('DOMContentLoaded', () => {
             <span><strong>Longest Win Streak:</strong> <span style="color: var(--primary-color);">${winStreak}</span></span>
         `;
         elements.finalSummary.innerHTML = summaryHtml;
+        // Save data first to prevent race condition, then show modal.
+        await sendDataToBackend();
         elements.finalResultsModal.style.display = 'flex';
-        await sendEventsToBackend();
     }
 
-    async function quitGame(e) {
+    // This is the single, reliable exit point for the game.
+    async function handleExit(e) {
         e.preventDefault();
         if (isSaving) return;
 
-        const targetUrl = elements.gameBody.dataset.gameListUrl;
-        if (!gameCompleted && currentRound > 0) {
+        // If the game has started but not finished, save it as abandoned.
+        if (gameStartTime && !gameCompleted) {
+            gameCompleted = false; // Explicitly mark as abandoned
             logEvent('game_quit', { round: currentRound });
-            await sendEventsToBackend();
+            await sendDataToBackend();
         }
-        window.location.href = targetUrl;
+
+        // Always redirect after handling the save operation.
+        window.location.href = elements.gameBody.dataset.gameListUrl;
     }
 
     // --- UI & FEEDBACK ---
@@ -249,34 +254,41 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function sendEventsToBackend() {
-        if (isSaving) return Promise.resolve();
+    async function sendDataToBackend() {
+        if (isSaving) return;
         isSaving = true;
+        elements.backToGamesBtn.disabled = true;
+        elements.returnToGamesFinalBtn.disabled = true;
 
-        const duration = Math.round((performance.now() - gameStartTime) / 1000);
         const csrfToken = elements.gameBody.dataset.csrfToken;
-
         const payload = {
-            game_type: 'money_exchange_2',
+            game_name: 'money_exchange_2',
             score: balance,
-            duration: duration,
+            duration_ms: Math.round(performance.now() - gameStartTime),
             completion_status: gameCompleted ? 'completed' : 'abandoned',
-            raw_data: { events: events, partner_personality: partner.personality }
+            events: events,
+            game_specific_data: { 
+                partner_personality: partner.personality,
+                final_trust_level: partner.trust,
+                longest_win_streak: winStreak
+            }
         };
 
-        return fetch('/games/save-result/', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
-            body: JSON.stringify(payload)
-        })
-        .then(res => res.json())
-        .then(data => {
-            if (!data.success) console.error('Failed to save game data.');
-        })
-        .catch(err => console.error('Error saving game data:', err))
-        .finally(() => {
+        try {
+            const response = await fetch('{% url "games:save_score" %}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                body: JSON.stringify(payload)
+            });
+            if (!response.ok) throw new Error('Server error during save.');
+            return await response.json();
+        } catch (err) {
+            console.error('Error saving game data:', err);
+        } finally {
             isSaving = false;
-        });
+            elements.backToGamesBtn.disabled = false;
+            elements.returnToGamesFinalBtn.disabled = false;
+        }
     }
 
     // --- INITIALIZATION ---

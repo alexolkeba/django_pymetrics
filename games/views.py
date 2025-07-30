@@ -2,12 +2,14 @@ from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods
 import json
 from .models import GameSession, GameResult
 from .utils import get_game_list_data
 
 @login_required
+@never_cache
 def game_list(request):
     """Display the list of available games and progress"""
     GAME_TYPES = [
