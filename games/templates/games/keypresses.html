@@ -65,6 +65,8 @@ function endGame() {
     window.removeEventListener('keydown', keyHandler);
     document.getElementById('feedback').textContent = `Game Over! Final keypresses: ${score}`;
     logEvent('end', {final_score: score});
+    // Mark that we're saving to backend to avoid duplicate saves
+    logEvent('backend_saved', {});
     sendEventsToBackend();
     gameCompleted = true; // Mark game as completed
 }
@@ -88,8 +90,21 @@ document.getElementById('back-to-games').onclick = function() {
             window.location.href = '/games/';
         });
     } else if (typeof gameCompleted !== 'undefined' && gameCompleted) {
-        // Game is already completed, just redirect
-        window.location.href = '/games/';
+        // Game is completed, ensure data is saved before redirecting
+        // Check if we need to save the completed game data
+        if (events.length > 0 && !events.some(e => e.event_type === 'backend_saved')) {
+            // Mark that we're saving to backend to avoid duplicate saves
+            logEvent('backend_saved', {});
+            sendEventsToBackend().then(() => {
+                window.location.href = '/games/';
+            }).catch(() => {
+                // Even if save fails, still redirect
+                window.location.href = '/games/';
+            });
+        } else {
+            // Data already saved or no data to save, safe to redirect
+            window.location.href = '/games/';
+        }
     } else {
         document.getElementById('start-btn').disabled = true;
         document.getElementById('game-area').innerHTML = `<div class='font-bold text-lg text-red-600'>Session Ended! Final keypresses: ${score}`;

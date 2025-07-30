@@ -209,7 +209,10 @@ document.getElementById('back-to-games').onclick = function() {
         endGame();
         setTimeout(() => { window.location.href = '{% url 'games:game_list' %}'; }, 500);
     } else {
-        window.location.href = '{% url 'games:game_list' %}';
+        // Game is completed, ensure data is saved before redirecting
+        setTimeout(() => {
+            window.location.href = '{% url 'games:game_list' %}';
+        }, 1000);
     }
 };
 </script>

@@ -72,6 +72,8 @@ document.getElementById('send-btn').onclick = function() {
     } else {
         document.getElementById('game-area').innerHTML = `<div class='font-bold text-lg'>Game Over! Final balance: $${balance}</div>`;
         logEvent('end', {final_balance: balance});
+        // Mark that we're saving to backend to avoid duplicate saves
+        logEvent('backend_saved', {});
         sendEventsToBackend();
         currentRound = TOTAL_ROUNDS + 1; // Mark game as completed
     }
@@ -95,8 +97,21 @@ document.getElementById('back-to-games').onclick = function() {
             window.location.href = '/games/';
         });
     } else {
-        // Game is already completed, just redirect
-        window.location.href = '/games/';
+        // Game is completed, ensure data is saved before redirecting
+        // Check if we need to save the completed game data
+        if (events.length > 0 && !events.some(e => e.event_type === 'backend_saved')) {
+            // Mark that we're saving to backend to avoid duplicate saves
+            logEvent('backend_saved', {});
+            sendEventsToBackend().then(() => {
+                window.location.href = '/games/';
+            }).catch(() => {
+                // Even if save fails, still redirect
+                window.location.href = '/games/';
+            });
+        } else {
+            // Data already saved or no data to save, safe to redirect
+            window.location.href = '/games/';
+        }
     }
 };
 
