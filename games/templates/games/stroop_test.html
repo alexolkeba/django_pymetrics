@@ -1,222 +1,345 @@
 {% extends 'base.html' %}
-
-{% block title %}Stroop Test Game - Rasmetric{% endblock %}
-
+{% load static %}
 {% block content %}
-<div class="min-h-screen bg-gray-50">
-  <div class="max-w-4xl mx-auto px-4 py-8">
-    <button
-      id="back-to-games"
-      class="flex items-center text-gray-600 hover:text-gray-900 mb-6"
-    >
-      <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-      </svg>
-      Back to Games
-    </button>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+<style>
+    :root {
+        --primary-color: #EC4899; /* Pink for engagement */
+        --secondary-color: #10B981;
+        --background-color: #111827;
+        --surface-color: #1F2937;
+        --text-color: #F9FAFB;
+        --muted-text-color: #9CA3AF;
+        --border-color: #374151;
+        --correct-color: #10B981;
+        --incorrect-color: #EF4444;
+    }
+    .game-body { background-color: var(--background-color); color: var(--text-color); font-family: 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 1rem; }
+    .game-container { background-color: var(--surface-color); border-radius: 12px; border: 1px solid var(--border-color); box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3); width: 100%; max-width: 900px; overflow: hidden; }
+    .game-header { background-color: rgba(0,0,0,0.2); padding: 1.5rem; text-align: center; border-bottom: 1px solid var(--border-color); }
+    .game-header h2 { font-size: 1.75rem; font-weight: bold; margin: 0; }
+    .dashboard { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 1rem; padding: 1.5rem; border-bottom: 1px solid var(--border-color); }
+    .stat-card { background-color: #374151; padding: 1rem; border-radius: 8px; text-align: center; }
+    .stat-card .value { font-size: 1.5rem; font-weight: bold; color: var(--primary-color); }
+    .stat-card .label { font-size: 0.8rem; color: var(--muted-text-color); text-transform: uppercase; }
+    .game-area { padding: 2rem; min-height: 400px; display: flex; flex-direction: column; justify-content: center; align-items: center; position: relative; }
+    #stimulus-word { font-size: 6rem; font-weight: bold; text-transform: uppercase; transition: transform 0.2s; }
+    .color-buttons { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-top: 3rem; width: 100%; max-width: 600px; }
+    .color-btn { padding: 1rem 2rem; border: 2px solid var(--border-color); border-radius: 8px; font-size: 1.25rem; font-weight: bold; cursor: pointer; transition: all 0.2s; background-color: transparent; color: var(--text-color); }
+    .color-btn:hover { border-color: var(--primary-color); color: var(--primary-color); transform: translateY(-3px); }
+    .feedback-indicator { font-size: 3rem; margin-top: 2rem; height: 60px; }
+    .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); justify-content: center; align-items: center; }
+    .modal-content { background-color: var(--surface-color); padding: 2rem; border-radius: 12px; border: 1px solid var(--border-color); max-width: 500px; width: 90%; text-align: center; box-shadow: 0 5px 15px rgba(0,0,0,0.5); animation: modal-pop 0.3s ease-out; }
+    @keyframes modal-pop { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    .btn { padding: 0.75rem 1.5rem; border: none; border-radius: 8px; font-size: 1rem; font-weight: bold; cursor: pointer; transition: background-color 0.2s; color: white; background-color: var(--primary-color); }
+    .btn:hover { background-color: #D946EF; }
+    #back-to-games { position: absolute; top: 20px; left: 20px; background-color: rgba(0, 0, 0, 0.3); color: var(--text-color); padding: 0.5rem 1rem; border-radius: 8px; text-decoration: none; font-weight: bold; z-index: 10; }
+    #timer-bar-container { width: 80%; max-width: 500px; height: 10px; background-color: #374151; border-radius: 5px; position: absolute; top: 20px; }
+    #timer-bar { width: 100%; height: 100%; background-color: var(--primary-color); border-radius: 5px; transition: width 0.1s linear; }
+</style>
 
-    <div id="gameContainer" class="text-center">
-      <h2 class="text-2xl font-bold text-gray-900 mb-4">Stroop Test</h2>
-      <div class="bg-white rounded-lg shadow-sm p-8 mb-6">
-        <div class="flex justify-between items-center mb-6">
-          <div>
-            <p class="text-sm text-gray-600">Round: <span id="roundDisplay">1</span>/20</p>
-            <p class="text-sm text-gray-600">Score: <span id="scoreDisplay">0</span></p>
-          </div>
+<div class="game-body" data-game-list-url="{% url 'games:game_list' %}">
+    <a href="#" id="back-to-games"><i class="fas fa-arrow-left"></i> Back to Games</a>
+
+    <div class="game-container">
+        <div class="game-header">
+            <h2 id="game-title">Cognitive Control Challenge</h2>
         </div>
-        <div id="stroopArea"></div>
-      </div>
+
+        <div class="dashboard">
+            <div class="stat-card"><div id="trial-display" class="value">0 / 40</div><div class="label">Trial</div></div>
+            <div class="stat-card"><div id="correct-display" class="value">0</div><div class="label">Correct</div></div>
+            <div class="stat-card"><div id="incorrect-display" class="value">0</div><div class="label">Incorrect</div></div>
+            <div class="stat-card"><div id="accuracy-display" class="value">100%</div><div class="label">Accuracy</div></div>
+            <div class="stat-card"><div id="avg-rt-display" class="value">-</div><div class="label">Avg. RT (ms)</div></div>
+        </div>
+
+        <div class="game-area">
+            <div id="timer-bar-container"> <div id="timer-bar"></div> </div>
+            <div id="stimulus-word"></div>
+            <div id="feedback-indicator" class="feedback-indicator"></div>
+            <div id="color-buttons" class="color-buttons"></div>
+        </div>
     </div>
 
-    <div id="gameOverContainer" class="text-center hidden">
-      <h2 class="text-2xl font-bold text-gray-900 mb-4">Game Complete!</h2>
-      <div class="bg-blue-50 rounded-lg p-6 mb-6">
-        <p class="text-lg text-gray-700 mb-2">Final Score: <span id="finalScore" class="font-bold text-blue-600">0</span></p>
-        <p class="text-lg text-gray-700 mb-2">Correct Answers: <span id="finalCorrect" class="font-bold text-green-600">0</span>/20</p>
-        <p class="text-sm text-gray-600">Accuracy: <span id="finalAccuracy">0</span>%</p>
-      </div>
-      <button
-        onclick="window.location.href='{% url 'games:game_list' %}'"
-        class="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700"
-      >
-        Continue
-      </button>
+    <!-- Modals -->
+    <div id="instruction-modal" class="modal" style="display: flex;">
+        <div class="modal-content">
+            <h3>Welcome to the Cognitive Control Challenge!</h3>
+            <p>Your task is to identify the FONT COLOR of the word, not the word itself. Respond as quickly and accurately as possible. The time you have to answer will adapt based on your performance.</p>
+            <button id="start-game-btn" class="btn">Start Congruent Block</button>
+        </div>
     </div>
-  </div>
+    <div id="break-modal" class="modal">
+        <div class="modal-content">
+            <h3>Block Complete!</h3>
+            <p>Great job! Now for the real challenge. The words will now conflict with their colors. Remember to focus only on the FONT COLOR.</p>
+            <button id="start-incongruent-btn" class="btn">Start Incongruent Block</button>
+        </div>
+    </div>
+    <div id="final-results-modal" class="modal">
+        <div class="modal-content">
+            <h3>Challenge Complete!</h3>
+            <div id="final-summary" style="text-align: left; margin: 1rem 0;"></div>
+            <button id="return-to-games-btn" class="btn">Back to Games</button>
+        </div>
+    </div>
 </div>
 
 <script>
-const totalRounds = 20;
-const colors = ['red', 'blue', 'green', 'yellow', 'purple', 'orange'];
-const colorWords = ['red', 'blue', 'green', 'yellow', 'purple', 'orange'];
-let round = 1;
-let score = 0;
-let gameOver = false;
-let startTime = Date.now();
-let roundStartTime = Date.now();
-let decisions = [];
-let reactionTimes = [];
-let feedback = null;
-let currentItem = null;
+document.addEventListener('DOMContentLoaded', () => {
+    // --- CONFIGURATION ---
+    const GAME_LIST_URL = document.querySelector('.game-body').dataset.gameListUrl;
+    const TRIALS_PER_BLOCK = 20;
+    const COLORS = {
+        'red': '#F87171', 'green': '#34D399', 'blue': '#60A5FA',
+        'yellow': '#FBBF24', 'purple': '#A78BFA', 'orange': '#F97316'
+    };
+    const INITIAL_TIME_LIMIT = 2000; // ms
+    const MIN_TIME_LIMIT = 500;
+    const MAX_TIME_LIMIT = 4000;
+    const TIME_ADJUSTMENT_CORRECT = 50; // ms to decrease
+    const TIME_ADJUSTMENT_INCORRECT = 100; // ms to increase
 
-function getColorClass(color) {
-  const colorMap = {
-    red: 'text-red-500',
-    blue: 'text-blue-500',
-    green: 'text-green-500',
-    yellow: 'text-yellow-500',
-    purple: 'text-purple-500',
-    orange: 'text-orange-500'
-  };
-  return colorMap[color] || 'text-gray-500';
-}
-function getButtonClass(color) {
-  const colorMap = {
-    red: 'bg-red-500 hover:bg-red-600',
-    blue: 'bg-blue-500 hover:bg-blue-600',
-    green: 'bg-green-500 hover:bg-green-600',
-    yellow: 'bg-yellow-500 hover:bg-yellow-600',
-    purple: 'bg-purple-500 hover:bg-purple-600',
-    orange: 'bg-orange-500 hover:bg-orange-600'
-  };
-  return colorMap[color] || 'bg-gray-500 hover:bg-gray-600';
-}
-function generateStroopItem() {
-  const word = colorWords[Math.floor(Math.random() * colorWords.length)];
-  const color = colors[Math.floor(Math.random() * colors.length)];
-  const isCongruent = word === color;
-  currentItem = { word, color, isCongruent };
-  roundStartTime = Date.now();
-  feedback = null;
-  renderStroopArea();
-}
-function handleColorClick(selectedColor) {
-  const reactionTime = Date.now() - roundStartTime;
-  reactionTimes.push(reactionTime);
-  const isCorrect = selectedColor === currentItem.color;
-  decisions.push({
-    round: round,
-    word: currentItem.word,
-    color: currentItem.color,
-    selectedColor: selectedColor,
-    correct: isCorrect,
-    congruent: currentItem.isCongruent,
-    reactionTime: reactionTime
-  });
-  if (isCorrect) {
-    score += 5;
-    feedback = 'Correct! ✓';
-  } else {
-    feedback = `Wrong! The color was ${currentItem.color}`;
-  }
-  renderStroopArea();
-  setTimeout(() => {
-    if (round < totalRounds) {
-      round++;
-      document.getElementById('roundDisplay').textContent = round;
-      document.getElementById('scoreDisplay').textContent = score;
-      generateStroopItem();
-    } else {
-      endGame();
-    }
-  }, 800);
-}
-function renderStroopArea() {
-  const area = document.getElementById('stroopArea');
-  area.innerHTML = '';
-  if (!currentItem) return;
-  const prompt = document.createElement('p');
-  prompt.className = 'text-lg text-gray-700 mb-4';
-  prompt.textContent = 'Click the color of the word (not what it says):';
-  area.appendChild(prompt);
-  const wordDiv = document.createElement('div');
-  wordDiv.className = `mb-8 text-6xl font-bold ${getColorClass(currentItem.color)}`;
-  wordDiv.textContent = currentItem.word.toUpperCase();
-  area.appendChild(wordDiv);
-  if (feedback) {
-    const feedbackDiv = document.createElement('div');
-    feedbackDiv.className = `mb-4 p-3 rounded-lg text-lg font-semibold ${feedback.includes('Correct') ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`;
-    feedbackDiv.textContent = feedback;
-    area.appendChild(feedbackDiv);
-  } else {
-    const grid = document.createElement('div');
-    grid.className = 'grid grid-cols-3 gap-4 max-w-lg mx-auto';
-    colors.forEach(color => {
-      const btn = document.createElement('button');
-      btn.className = `${getButtonClass(color)} text-white px-6 py-3 rounded-lg font-semibold transition-colors`;
-      btn.textContent = color.toUpperCase();
-      btn.onclick = () => handleColorClick(color);
-      grid.appendChild(btn);
-    });
-    area.appendChild(grid);
-  }
-}
-function endGame() {
-  gameOver = true;
-  document.getElementById('gameContainer').classList.add('hidden');
-  document.getElementById('gameOverContainer').classList.remove('hidden');
-  document.getElementById('finalScore').textContent = score;
-  const correct = decisions.filter(d => d.correct).length;
-  document.getElementById('finalCorrect').textContent = correct;
-  document.getElementById('finalAccuracy').textContent = Math.round((correct / totalRounds) * 100);
-  saveGameResult();
-}
-function saveGameResult() {
-  const totalTime = Date.now() - startTime;
-  const accuracy = decisions.filter(d => d.correct).length / decisions.length;
-  const congruentItems = decisions.filter(d => d.congruent);
-  const incongruentItems = decisions.filter(d => !d.congruent);
-  const gameData = {
-    game_type: 'stroop_test',
-    score: Math.min(score, 100),
-    duration: totalTime,
-    decisions: decisions,
-    reaction_times: reactionTimes,
-    raw_data: {
-      finalScore: score,
-      accuracy: accuracy,
-      averageReactionTime: reactionTimes.length ? reactionTimes.reduce((a, b) => a + b, 0) / reactionTimes.length : 0,
-      congruentAccuracy: congruentItems.length > 0 ? congruentItems.filter(d => d.correct).length / congruentItems.length : 0,
-      incongruentAccuracy: incongruentItems.length > 0 ? incongruentItems.filter(d => d.correct).length / incongruentItems.length : 0,
-      stroopInterference: (congruentItems.length ? congruentItems.reduce((sum, d) => sum + d.reactionTime, 0) / congruentItems.length : 0) -
-                         (incongruentItems.length ? incongruentItems.reduce((sum, d) => sum + d.reactionTime, 0) / incongruentItems.length : 0)
-    }
-  };
-  fetch('{% url "games:save_game_result" %}', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-    },
-    body: JSON.stringify(gameData)
-  })
-  .then(response => response.json())
-  .then(data => {
-    console.log('Game result saved:', data);
-  })
-  .catch(error => {
-    console.error('Error saving game result:', error);
-  });
-}
-document.addEventListener('DOMContentLoaded', function() {
-  generateStroopItem();
-  document.getElementById('roundDisplay').textContent = round;
-  document.getElementById('scoreDisplay').textContent = score;
-});
-document.getElementById('back-to-games').onclick = function() {
-    document.getElementById('back-to-games').disabled = true;
-    if (!gameOver) {
-        endGame();
-        setTimeout(() => { window.location.href = '{% url 'games:game_list' %}'; }, 500);
-    } else {
-        // Game is completed, ensure data is saved before redirecting
-        // Add a small delay to ensure any pending save operations complete
+    // --- DOM ELEMENTS ---
+    const stimulusWord = document.getElementById('stimulus-word');
+    const colorButtonsContainer = document.getElementById('color-buttons');
+    const feedbackIndicator = document.getElementById('feedback-indicator');
+    const instructionModal = document.getElementById('instruction-modal');
+    const breakModal = document.getElementById('break-modal');
+    const finalResultsModal = document.getElementById('final-results-modal');
+    const startGameBtn = document.getElementById('start-game-btn');
+    const startIncongruentBtn = document.getElementById('start-incongruent-btn');
+    const returnToGamesBtn = document.getElementById('return-to-games-btn');
+    const backToGamesBtn = document.getElementById('back-to-games');
+    const timerBar = document.getElementById('timer-bar');
+
+    const trialDisplay = document.getElementById('trial-display');
+    const correctDisplay = document.getElementById('correct-display');
+    const incorrectDisplay = document.getElementById('incorrect-display');
+    const accuracyDisplay = document.getElementById('accuracy-display');
+    const avgRtDisplay = document.getElementById('avg-rt-display');
+
+    // --- GAME STATE ---
+    let gameState = 'instructions';
+    let totalTrialCount = 0;
+    let blockTrialCount = 0;
+    let correctCount = 0;
+    let incorrectCount = 0;
+    let congruentRTs = [];
+    let incongruentRTs = [];
+    let adaptiveTimeLimit = INITIAL_TIME_LIMIT;
+    let trialStartTime;
+    let trialTimerInterval;
+    let events = [];
+    let gameStartTime;
+    let gameCompleted = false;
+
+    // --- FUNCTIONS ---
+    const showModal = (modal) => modal.style.display = 'flex';
+    const hideModal = (modal) => modal.style.display = 'none';
+
+    const updateDashboard = () => {
+        const totalTrials = correctCount + incorrectCount;
+        const accuracy = totalTrials > 0 ? Math.round((correctCount / totalTrials) * 100) : 100;
+        const allRTs = [...congruentRTs, ...incongruentRTs];
+        const avgRT = allRTs.length > 0 ? Math.round(allRTs.reduce((a, b) => a + b, 0) / allRTs.length) : '-';
+        trialDisplay.textContent = `${totalTrialCount} / ${TRIALS_PER_BLOCK * 2}`;
+        correctDisplay.textContent = correctCount;
+        incorrectDisplay.textContent = incorrectCount;
+        accuracyDisplay.textContent = `${accuracy}%`;
+        avgRtDisplay.textContent = avgRT;
+    };
+
+    const startTrialTimer = () => {
+        let timeLeft = adaptiveTimeLimit;
+        timerBar.style.transition = 'none';
+        timerBar.style.width = '100%';
         setTimeout(() => {
-            window.location.href = '{% url 'games:game_list' %}';
-        }, 1000);
-    }
-};
-</script>
+            timerBar.style.transition = `width ${adaptiveTimeLimit / 1000}s linear`;
+            timerBar.style.width = '0%';
+        }, 20);
+        trialTimerInterval = setTimeout(() => handleResponse(null, null, 'timeout'), adaptiveTimeLimit);
+    };
 
-{% csrf_token %}
+    const generateTrial = () => {
+        const colorNames = Object.keys(COLORS);
+        const randomColorName = colorNames[Math.floor(Math.random() * colorNames.length)];
+        const randomColorHex = COLORS[randomColorName];
+        let randomWord;
+        if (gameState === 'congruent') {
+            randomWord = randomColorName;
+        } else { // incongruent
+            let otherWords = colorNames.filter(name => name !== randomColorName);
+            randomWord = otherWords[Math.floor(Math.random() * otherWords.length)];
+        }
+        return { word: randomWord, colorName: randomColorName, colorHex: randomColorHex };
+    };
+
+    const presentTrial = () => {
+        colorButtonsContainer.innerHTML = '';
+        feedbackIndicator.textContent = '';
+        const trial = generateTrial();
+        stimulusWord.textContent = trial.word;
+        stimulusWord.style.color = trial.colorHex;
+
+        Object.keys(COLORS).forEach(colorName => {
+            const btn = document.createElement('button');
+            btn.className = 'color-btn';
+            btn.textContent = colorName;
+            btn.style.borderColor = COLORS[colorName];
+            btn.onclick = () => handleResponse(colorName, trial);
+            colorButtonsContainer.appendChild(btn);
+        });
+        trialStartTime = Date.now();
+        startTrialTimer();
+    };
+
+    const handleResponse = (selectedColorName, trial, status) => {
+        clearTimeout(trialTimerInterval);
+        const reactionTime = Date.now() - trialStartTime;
+        let isCorrect = false;
+
+        if (status === 'timeout') {
+            feedbackIndicator.textContent = '⌛';
+            feedbackIndicator.style.color = 'orange';
+            incorrectCount++;
+            adaptiveTimeLimit = Math.min(MAX_TIME_LIMIT, adaptiveTimeLimit + TIME_ADJUSTMENT_INCORRECT);
+        } else {
+            isCorrect = selectedColorName === trial.colorName;
+            if (isCorrect) {
+                feedbackIndicator.textContent = '✓';
+                feedbackIndicator.style.color = '#10B981';
+                correctCount++;
+                adaptiveTimeLimit = Math.max(MIN_TIME_LIMIT, adaptiveTimeLimit - TIME_ADJUSTMENT_CORRECT);
+                if (gameState === 'congruent') congruentRTs.push(reactionTime); else incongruentRTs.push(reactionTime);
+            } else {
+                feedbackIndicator.textContent = '✗';
+                feedbackIndicator.style.color = '#EF4444';
+                incorrectCount++;
+                adaptiveTimeLimit = Math.min(MAX_TIME_LIMIT, adaptiveTimeLimit + TIME_ADJUSTMENT_INCORRECT);
+            }
+        }
+
+        events.push({ 
+            event_type: 'response', trial: totalTrialCount + 1, condition: gameState, 
+            is_correct: isCorrect, rt: reactionTime, status: status || 'answered',
+            stimulus: trial, response: selectedColorName, time_limit: adaptiveTimeLimit,
+            timestamp: Date.now() - gameStartTime
+        });
+
+        totalTrialCount++;
+        blockTrialCount++;
+        updateDashboard();
+        colorButtonsContainer.innerHTML = '<p style="font-size: 1.5rem;">...</p>';
+
+        setTimeout(() => {
+            if (blockTrialCount < TRIALS_PER_BLOCK) {
+                presentTrial();
+            } else {
+                if (gameState === 'congruent') {
+                    gameState = 'break';
+                    blockTrialCount = 0;
+                    showModal(breakModal);
+                } else if (gameState === 'incongruent') {
+                    endGame();
+                }
+            }
+        }, 1200);
+    };
+
+    const startGame = () => {
+        gameState = 'congruent';
+        gameStartTime = Date.now();
+        events.push({ event_type: 'game_start', timestamp: 0 });
+        hideModal(instructionModal);
+        presentTrial();
+    };
+
+    const startIncongruentBlock = () => {
+        gameState = 'incongruent';
+        hideModal(breakModal);
+        presentTrial();
+    };
+
+    const endGame = () => {
+        gameState = 'finished';
+        gameCompleted = true;
+        events.push({ event_type: 'game_end', timestamp: Date.now() - gameStartTime });
+        displayFinalResults();
+        showModal(finalResultsModal);
+        sendDataToBackend();
+    };
+
+    const displayFinalResults = () => {
+        const summaryContainer = document.getElementById('final-summary');
+        const avgCongruentRT = congruentRTs.length > 0 ? Math.round(congruentRTs.reduce((a, b) => a + b, 0) / congruentRTs.length) : 0;
+        const avgIncongruentRT = incongruentRTs.length > 0 ? Math.round(incongruentRTs.reduce((a, b) => a + b, 0) / incongruentRTs.length) : 0;
+        const stroopEffect = avgIncongruentRT - avgCongruentRT;
+
+        summaryContainer.innerHTML = `
+            <p><strong>Accuracy:</strong> ${accuracyDisplay.textContent}</p>
+            <p><strong>Avg. Congruent RT:</strong> ${avgCongruentRT} ms</p>
+            <p><strong>Avg. Incongruent RT:</strong> ${avgIncongruentRT} ms</p>
+            <p><strong>Stroop Interference:</strong> ${stroopEffect} ms</p>
+            <p><strong>Final Time Limit:</strong> ${adaptiveTimeLimit} ms</p>
+        `;
+    };
+
+    const sendDataToBackend = () => {
+        const completionStatus = gameCompleted ? 'completed' : 'abandoned';
+        const totalDuration = Date.now() - gameStartTime;
+        const score = correctCount * 10 - incorrectCount * 5; // Example scoring
+
+        const avgCongruentRT = congruentRTs.length > 0 ? Math.round(congruentRTs.reduce((a, b) => a + b, 0) / congruentRTs.length) : 0;
+        const avgIncongruentRT = incongruentRTs.length > 0 ? Math.round(incongruentRTs.reduce((a, b) => a + b, 0) / incongruentRTs.length) : 0;
+
+        const data = {
+            game_name: 'stroop_test',
+            score: Math.max(0, score),
+            duration_ms: totalDuration,
+            completion_status: completionStatus,
+            events: events,
+            game_specific_data: {
+                correct_count: correctCount,
+                incorrect_count: incorrectCount,
+                accuracy: (correctCount + incorrectCount) > 0 ? correctCount / (correctCount + incorrectCount) : 0,
+                avg_congruent_rt: avgCongruentRT,
+                avg_incongruent_rt: avgIncongruentRT,
+                stroop_effect: avgIncongruentRT - avgCongruentRT,
+                final_time_limit: adaptiveTimeLimit
+            }
+        };
+
+        return fetch('{% url "games:save_score" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify(data)
+        });
+    };
+
+    // --- EVENT LISTENERS ---
+    startGameBtn.addEventListener('click', startGame);
+    startIncongruentBtn.addEventListener('click', startIncongruentBlock);
+    
+    const handleExit = (e) => {
+        e.preventDefault();
+        e.target.style.pointerEvents = 'none';
+        e.target.disabled = true;
+        if (gameState !== 'finished') {
+            sendDataToBackend().finally(() => {
+                window.location.href = GAME_LIST_URL;
+            });
+        } else {
+             window.location.href = GAME_LIST_URL;
+        }
+    };
+
+    returnToGamesBtn.addEventListener('click', handleExit);
+    backToGamesBtn.addEventListener('click', handleExit);
+});
+</script>
 {% endblock %}

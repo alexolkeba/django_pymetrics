@@ -1,298 +1,344 @@
 {% extends 'base.html' %}
-
-{% block title %}Stop Signal Game - Rasmetric{% endblock %}
-
+{% load static %}
 {% block content %}
-<div class="min-h-screen bg-gray-50">
-  <div class="max-w-4xl mx-auto px-4 py-8">
-    <button
-      id="back-to-games"
-      class="flex items-center text-gray-600 hover:text-gray-900 mb-6"
-    >
-      <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-      </svg>
-      Back to Games
-    </button>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+<style>
+    :root {
+        --primary-color: #F472B6; /* Pink-400 */
+        --go-color: #60A5FA;      /* Blue-400 */
+        --stop-color: #F87171;    /* Red-400 */
+        --background-color: #0F172A; /* Slate-900 */
+        --surface-color: #1E293B;   /* Slate-800 */
+        --text-color: #F1F5F9;       /* Slate-100 */
+        --muted-text-color: #94A3B8; /* Slate-400 */
+        --border-color: #334155;     /* Slate-700 */
+    }
+    .game-body { background-color: var(--background-color); color: var(--text-color); font-family: 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 1rem; }
+    .game-container { background-color: var(--surface-color); border-radius: 12px; border: 1px solid var(--border-color); box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3); width: 100%; max-width: 800px; overflow: hidden; }
+    .game-header { background-color: rgba(0,0,0,0.2); padding: 1.5rem; text-align: center; border-bottom: 1px solid var(--border-color); }
+    .game-header h2 { font-size: 1.75rem; font-weight: bold; margin: 0; }
+    .dashboard { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 1rem; padding: 1.5rem; border-bottom: 1px solid var(--border-color); }
+    .stat-card { background-color: rgba(0,0,0,0.2); padding: 1rem; border-radius: 8px; text-align: center; }
+    .stat-card .value { font-size: 1.5rem; font-weight: bold; color: var(--primary-color); }
+    .stat-card .label { font-size: 0.8rem; color: var(--muted-text-color); text-transform: uppercase; font-weight: 600; }
+    .game-area { padding: 2rem; min-height: 350px; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+    #stimulus-area { width: 100%; height: 200px; display: flex; justify-content: center; align-items: center; font-size: 7rem; font-weight: bold; transition: color 0.1s; }
+    .feedback-area { text-align: center; margin-top: 1.5rem; font-size: 1.1rem; color: var(--muted-text-color); min-height: 24px; }
+    .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); justify-content: center; align-items: center; }
+    .modal-content { background-color: var(--surface-color); padding: 2.5rem; border-radius: 12px; border: 1px solid var(--border-color); max-width: 500px; width: 90%; box-shadow: 0 5px 15px rgba(0,0,0,0.5); animation: modal-pop 0.3s ease-out; text-align: center; }
+    @keyframes modal-pop { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    .btn { padding: 0.75rem 2rem; border: none; border-radius: 8px; font-size: 1rem; font-weight: bold; cursor: pointer; transition: all 0.2s; color: var(--background-color); background-color: var(--primary-color); }
+    .btn:hover { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(244, 114, 182, 0.3); }
+    #back-to-games-btn { position: absolute; top: 20px; left: 20px; background-color: rgba(0, 0, 0, 0.3); color: var(--text-color); padding: 0.5rem 1rem; border-radius: 8px; text-decoration: none; font-weight: bold; z-index: 10; }
+</style>
 
-    <div id="gameContainer" class="text-center">
-      <h2 class="text-2xl font-bold text-gray-900 mb-4">Stop Signal Task</h2>
-      <div class="bg-white rounded-lg shadow-sm p-8 mb-6">
-        <div class="flex justify-between items-center mb-6">
-          <div>
-            <p class="text-sm text-gray-600">Trial: <span id="trialDisplay">1</span>/40</p>
-            <p class="text-sm text-gray-600">Score: <span id="scoreDisplay">0</span></p>
-          </div>
+<div class="game-body" data-game-list-url="{% url 'games:game_list' %}" data-csrf-token="{{ csrf_token }}">
+    <a href="#" id="back-to-games-btn"><i class="fas fa-arrow-left"></i> Back to Games</a>
+
+    <div class="game-container">
+        <div class="game-header"><h2>Inhibitory Control Challenge</h2></div>
+        <div class="dashboard">
+            <div class="stat-card"><div id="trial-count" class="value">-</div><div class="label">Trial</div></div>
+            <div class="stat-card"><div id="ssrt" class="value">-</div><div class="label">SSRT (ms)</div></div>
+            <div class="stat-card"><div id="go-accuracy" class="value">-</div><div class="label">Go Accuracy</div></div>
+            <div class="stat-card"><div id="stop-accuracy" class="value">-</div><div class="label">Stop Accuracy</div></div>
         </div>
-        <div class="h-64 flex items-center justify-center mb-6" id="stimulusArea"></div>
-        <div class="text-sm text-gray-600 space-y-2">
-          <p>Press ← (or A) for left arrows, → (or D) for right arrows</p>
-          <p class="font-semibold text-red-600">STOP if you see the red stop sign! 🛑</p>
-          <div id="stopPrompt"></div>
+        <div class="game-area">
+            <div id="stimulus-area"></div>
+            <div id="feedback-area" class="feedback-area">Press the correct arrow key. If the arrow turns red, withhold your response.</div>
         </div>
-      </div>
     </div>
 
-    <div id="gameOverContainer" class="text-center hidden">
-      <h2 class="text-2xl font-bold text-gray-900 mb-4">Task Complete!</h2>
-      <div class="bg-blue-50 rounded-lg p-6 mb-6">
-        <p class="text-lg text-gray-700 mb-2">Final Score: <span id="finalScore" class="font-bold text-blue-600">0</span></p>
-        <p class="text-lg text-gray-700 mb-2">Stop Accuracy: <span id="finalCorrect" class="font-bold text-green-600">0</span>/<span id="finalTotal">0</span></p>
-        <p class="text-sm text-gray-600">Impulse Control: <span id="finalImpulse">0</span>%</p>
-      </div>
-      <button
-        onclick="window.location.href='{% url 'games:game_list' %}'"
-        class="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700"
-      >
-        Continue
-      </button>
+    <!-- Modals -->
+    <div id="instruction-modal" class="modal" style="display: flex;">
+        <div class="modal-content">
+            <h3 style="font-size: 1.5rem; font-weight: bold; color: var(--primary-color);">Inhibitory Control Challenge</h3>
+            <p style="margin: 1rem 0; color: var(--muted-text-color);">Your task is to respond to the direction of the arrow as quickly and accurately as possible.</p>
+            <ul style="text-align: left; margin: 1rem auto; max-width: 90%; color: var(--muted-text-color);">
+                <li>Press <strong>LEFT (←)</strong> for a left-pointing arrow.</li>
+                <li>Press <strong>RIGHT (→)</strong> for a right-pointing arrow.</li>
+                <li style="margin-top: 0.5rem; color: var(--stop-color); font-weight: bold;">BUT... if the arrow turns red, you must STOP and NOT press any key.</li>
+            </ul>
+            <p style="font-weight: bold;">This task measures your ability to inhibit a response. Good luck!</p>
+            <button id="start-game-btn" class="btn" style="margin-top: 1.5rem;">Begin</button>
+        </div>
     </div>
-  </div>
+
+    <div id="final-results-modal" class="modal">
+        <div class="modal-content">
+            <h3 style="font-size: 1.5rem; font-weight: bold; color: var(--primary-color);">Challenge Complete!</h3>
+            <div id="final-summary" style="margin: 1.5rem 0; font-size: 1.1rem; display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;"></div>
+            <button id="return-to-games-final-btn" class="btn">Return to Games</button>
+        </div>
+    </div>
 </div>
 
 <script>
-const totalTrials = 40;
-const stopTrialProbability = 0.25;
-const ARROW_DISPLAY_TIME = 1200; // ms, total time arrow is visible
-const STOP_SIGNAL_DELAY_MIN = 400; // ms
-const STOP_SIGNAL_DELAY_MAX = 600; // ms
-const GO_TRIAL_TIMEOUT = 3000; // ms, max time to wait for user input on go trials
-const RESPONSE_FEEDBACK_TIME = 700; // ms
-const STOP_TRIAL_TIMEOUT = 3000; // ms, red arrow max display time
+document.addEventListener('DOMContentLoaded', () => {
+    // --- CONFIG & STATE ---
+    const config = {
+        totalTrials: 80,
+        stopSignalProbability: 0.25,
+        fixationDuration: 500, // ms
+        goSignalMaxDuration: 1000, // ms
+        feedbackDuration: 700, // ms
+        initialSSD: 250, // ms
+        ssdStep: 50, // ms, staircase adjustment
+        minSSD: 50,
+        maxSSD: 800,
+    };
 
-let gameState = 'waiting';
-let currentTrial = 1;
-let arrowDirection = 'right';
-let isStopTrial = false;
-let hasStopSignal = false;
-let hasResponded = false;
-let startTime = Date.now();
-let trialStartTime = 0;
-let decisions = [];
-let reactionTimes = [];
-let score = 0;
-let stopSignalTimeout = null;
-let autoAdvanceTimeout = null;
-let responseFeedbackTimeout = null;
-let arrowDiv = null;
-let arrow = null;
+    let state = {
+        currentTrial: 0,
+        ssd: config.initialSSD,
+        gameStartTime: null,
+        trialStartTime: null,
+        gameState: 'idle',
+        events: [],
+        goRTs: [],
+        goSuccessCount: 0,
+        goTotalCount: 0,
+        stopSuccessCount: 0,
+        stopTotalCount: 0,
+        gameCompleted: false,
+        isSaving: false,
+        currentStimulus: { type: null, direction: null },
+        timeouts: [],
+    };
 
-function clearAllTimeouts() {
-  clearTimeout(stopSignalTimeout);
-  clearTimeout(autoAdvanceTimeout);
-  clearTimeout(responseFeedbackTimeout);
-}
+    // --- DOM ELEMENTS ---
+    const elements = {
+        gameBody: document.querySelector('.game-body'),
+        trialCount: document.getElementById('trial-count'),
+        ssrt: document.getElementById('ssrt'),
+        goAccuracy: document.getElementById('go-accuracy'),
+        stopAccuracy: document.getElementById('stop-accuracy'),
+        stimulusArea: document.getElementById('stimulus-area'),
+        feedbackArea: document.getElementById('feedback-area'),
+        instructionModal: document.getElementById('instruction-modal'),
+        startGameBtn: document.getElementById('start-game-btn'),
+        finalResultsModal: document.getElementById('final-results-modal'),
+        finalSummary: document.getElementById('final-summary'),
+        backToGamesBtn: document.getElementById('back-to-games-btn'),
+        returnToGamesFinalBtn: document.getElementById('return-to-games-final-btn'),
+    };
 
-function setGameState(state) {
-  gameState = state;
-  renderStimulus();
-}
+    // --- GAME LOGIC ---
+    function initGame() {
+        elements.startGameBtn.addEventListener('click', startGame);
+        elements.backToGamesBtn.addEventListener('click', (e) => quitGame(e));
+        elements.returnToGamesFinalBtn.addEventListener('click', (e) => quitGame(e));
+        document.addEventListener('keydown', handleKeyPress);
+    }
 
-function renderStimulus() {
-  const area = document.getElementById('stimulusArea');
-  area.innerHTML = '';
-  document.getElementById('stopPrompt').innerHTML = '';
-  clearAllTimeouts();
-  arrowDiv = null;
-  arrow = null;
-  hasResponded = false;
+    function startGame() {
+        elements.instructionModal.style.display = 'none';
+        state.gameStartTime = performance.now();
+        logEvent('game_start');
+        runTrial();
+    }
 
-  if (gameState === 'waiting') {
-    area.innerHTML = '<div class="text-2xl text-gray-500">Get ready...</div>';
-    setTimeout(() => {
-      startTrial();
-    }, 1200);
-  } else if (gameState === 'arrow') {
-    const direction = Math.random() > 0.5 ? 'right' : 'left';
-    arrowDirection = direction;
-    isStopTrial = Math.random() < stopTrialProbability;
-    hasStopSignal = isStopTrial;
-    trialStartTime = Date.now();
-    arrowDiv = document.createElement('div');
-    arrowDiv.className = 'relative';
-    arrow = document.createElement('div');
-    arrow.className = isStopTrial ? 'text-8xl transition-all duration-100 text-red-500' : 'text-8xl transition-all duration-100 text-blue-600';
-    arrow.textContent = direction === 'left' ? '←' : '→';
-    arrowDiv.appendChild(arrow);
-    arrowDiv.id = 'arrowDiv';
-    area.appendChild(arrowDiv);
-    if (isStopTrial) {
-      // Remove stop sign icon for stop trial (do not append it)
-      document.getElementById('stopPrompt').innerHTML = '<p class="text-red-600 font-bold animate-pulse">STOP! Don\'t press any key!</p>';
-      autoAdvanceTimeout = setTimeout(() => {
-        if (!hasResponded) {
-          handleNoResponseStopTrial();
+    function runTrial() {
+        if (state.currentTrial >= config.totalTrials) {
+            endGame(true);
+            return;
         }
-      }, STOP_TRIAL_TIMEOUT);
+        state.currentTrial++;
+        updateDashboard();
+        clearTimeouts();
+
+        state.gameState = 'fixation';
+        elements.stimulusArea.innerHTML = '<div style="color: var(--muted-text-color)">+</div>';
+        elements.feedbackArea.textContent = '';
+
+        const fixationTimeout = setTimeout(() => {
+            state.trialStartTime = performance.now();
+            const isStopTrial = Math.random() < config.stopSignalProbability;
+            const direction = Math.random() < 0.5 ? 'left' : 'right';
+            state.currentStimulus = { type: isStopTrial ? 'stop' : 'go', direction };
+
+            if (isStopTrial) {
+                state.stopTotalCount++;
+                state.gameState = 'stop_signal';
+                displayGoSignal(direction);
+                const stopTimeout = setTimeout(() => {
+                    displayStopSignal();
+                }, state.ssd);
+                state.timeouts.push(stopTimeout);
+            } else {
+                state.goTotalCount++;
+                state.gameState = 'go_signal';
+                displayGoSignal(direction);
+            }
+
+            const noResponseTimeout = setTimeout(() => handleResponse(null), config.goSignalMaxDuration);
+            state.timeouts.push(noResponseTimeout);
+
+        }, config.fixationDuration);
+        state.timeouts.push(fixationTimeout);
     }
-    // No auto-advance for go trials: wait indefinitely for user input
-  } else if (gameState === 'responded') {
-    // Feedback is set in showFeedback
-  } else if (gameState === 'finished') {
-    // handled elsewhere
-  }
-}
 
-function startTrial() {
-  setGameState('arrow');
-}
-
-function handleKeyPress(event) {
-  console.log('Keydown event:', event.key, 'gameState:', gameState, 'hasResponded:', hasResponded);
-  if (document.hasFocus() === false) {
-    alert('Click anywhere on the page to focus and enable keyboard input!');
-    return;
-  }
-  if (gameState !== 'arrow' || hasResponded) return;
-  if (isStopTrial) {
-    if (event.key === 'ArrowLeft' || event.key === 'a' || event.key === 'ArrowRight' || event.key === 'd') {
-      hasResponded = true;
-      handleResponse(event.key, true, 'Response recorded');
+    function handleKeyPress(e) {
+        if (state.gameState !== 'go_signal' && state.gameState !== 'stop_signal') return;
+        if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+        handleResponse(e.key);
     }
-  } else if (!isStopTrial) {
-    if (event.key === 'ArrowLeft' || event.key === 'a' || event.key === 'ArrowRight' || event.key === 'd') {
-      hasResponded = true;
-      handleResponse(event.key, false, '');
+
+    function handleResponse(key) {
+        if (state.gameState === 'fixation' || state.gameState === 'feedback') return;
+        clearTimeouts();
+
+        const rt = performance.now() - state.trialStartTime;
+        const { type, direction } = state.currentStimulus;
+        let outcome, feedbackText;
+
+        if (type === 'go') {
+            if (!key) {
+                outcome = 'go_miss';
+                feedbackText = 'Miss!';
+            } else if ((key === 'ArrowLeft' && direction === 'left') || (key === 'ArrowRight' && direction === 'right')) {
+                outcome = 'go_correct';
+                feedbackText = 'Correct!';
+                state.goSuccessCount++;
+                state.goRTs.push(rt);
+            } else {
+                outcome = 'go_incorrect';
+                feedbackText = 'Wrong Key!';
+            }
+        } else { // stop trial
+            if (!key) {
+                outcome = 'stop_success';
+                feedbackText = 'Good stop!';
+                state.stopSuccessCount++;
+                state.ssd = Math.min(config.maxSSD, state.ssd + config.ssdStep);
+            } else {
+                outcome = 'stop_fail';
+                feedbackText = 'Too fast!';
+                state.ssd = Math.max(config.minSSD, state.ssd - config.ssdStep);
+            }
+        }
+        logEvent('trial_response', { trial: state.currentTrial, type, direction, response: key, rt, outcome, new_ssd: state.ssd });
+        showFeedback(feedbackText, outcome);
     }
-  }
-}
 
-function handleResponse(key, failedStop, feedbackMsg) {
-  clearAllTimeouts();
-  const reactionTime = Date.now() - trialStartTime;
-  const correctKey = arrowDirection === 'left' ? 'ArrowLeft' : 'ArrowRight';
-  const isCorrectDirection = key === correctKey || (key === 'a' && arrowDirection === 'left') || (key === 'd' && arrowDirection === 'right');
-  let trialScore = 0;
-  let outcome = '';
-  let feedback = '';
-  if (isStopTrial && hasStopSignal) {
-    outcome = failedStop ? 'failed_stop' : 'correct_stop';
-    trialScore = failedStop ? -2 : 2;
-    feedback = failedStop ? 'Failed to stop!' : 'Correct stop!';
-  } else if (isStopTrial && !hasStopSignal) {
-    outcome = 'correct_go';
-    trialScore = isCorrectDirection ? 2 : -1;
-    feedback = isCorrectDirection ? 'Correct!' : 'Wrong key!';
-  } else {
-    outcome = isCorrectDirection ? 'correct_go' : 'incorrect_direction';
-    trialScore = isCorrectDirection ? 2 : -1;
-    feedback = isCorrectDirection ? 'Correct!' : 'Wrong key!';
-  }
-  score += trialScore;
-  reactionTimes.push(reactionTime);
-  decisions.push({
-    trial: currentTrial,
-    arrowDirection,
-    isStopTrial,
-    hasStopSignal,
-    keyPressed: key,
-    correctDirection: isCorrectDirection,
-    reactionTime,
-    outcome,
-    score: trialScore
-  });
-  showFeedback(feedback);
-}
+    function showFeedback(text, outcome) {
+        state.gameState = 'feedback';
+        elements.feedbackArea.textContent = text;
+        elements.feedbackArea.style.color = (outcome.includes('correct') || outcome.includes('success')) ? 'var(--go-color)' : 'var(--stop-color)';
+        if(outcome === 'stop_success') elements.feedbackArea.style.color = 'var(--go-color)';
 
-function handleNoResponseStopTrial() {
-  hasResponded = true;
-  showFeedback('Response recorded');
-}
-
-function handleNoResponseGoTrial() {
-  hasResponded = true;
-  handleResponse('none', false, 'Missed!');
-}
-
-function showFeedback(feedback) {
-  setGameState('responded');
-  const area = document.getElementById('stimulusArea');
-  area.innerHTML = `<div class="text-2xl text-green-600">${feedback}</div>`;
-  responseFeedbackTimeout = setTimeout(() => {
-    if (currentTrial < totalTrials) {
-      currentTrial++;
-      document.getElementById('trialDisplay').textContent = currentTrial;
-      document.getElementById('scoreDisplay').textContent = score;
-      setGameState('waiting');
-    } else {
-      endGame();
+        const feedbackTimeout = setTimeout(runTrial, config.feedbackDuration);
+        state.timeouts.push(feedbackTimeout);
     }
-  }, RESPONSE_FEEDBACK_TIME);
-}
 
-function endGame() {
-  gameState = 'finished';
-  document.getElementById('gameContainer').classList.add('hidden');
-  document.getElementById('gameOverContainer').classList.remove('hidden');
-  document.getElementById('finalScore').textContent = score;
-  const correctStops = decisions.filter(d => d.isStopTrial && d.hasStopSignal && d.outcome !== 'failed_stop').length;
-  const totalStopTrials = decisions.filter(d => d.isStopTrial && d.hasStopSignal).length;
-  document.getElementById('finalCorrect').textContent = correctStops;
-  document.getElementById('finalTotal').textContent = totalStopTrials;
-  document.getElementById('finalImpulse').textContent = Math.round((totalStopTrials > 0 ? correctStops / totalStopTrials : 0) * 100);
-  saveGameResult();
-}
+    function endGame(completed) {
+        if (state.isSaving) return;
+        clearTimeouts();
+        state.gameCompleted = completed;
+        logEvent('game_end', { completed });
 
-function saveGameResult() {
-  const totalTime = Date.now() - startTime;
-  const correctStops = decisions.filter(d => d.isStopTrial && d.hasStopSignal && d.outcome !== 'failed_stop').length;
-  const totalStopTrials = decisions.filter(d => d.isStopTrial && d.hasStopSignal).length;
-  const stopAccuracy = totalStopTrials > 0 ? correctStops / totalStopTrials : 0;
-  const gameData = {
-    game_type: 'stop_signal',
-    score: Math.max(0, Math.min(100, 50 + score)),
-    duration: totalTime,
-    decisions: decisions,
-    reaction_times: reactionTimes,
-    raw_data: {
-      finalScore: score,
-      stopAccuracy: stopAccuracy,
-      correctStops: correctStops,
-      totalStopTrials: totalStopTrials,
-      averageReactionTime: reactionTimes.length ? reactionTimes.reduce((a, b) => a + b, 0) / reactionTimes.length : 0,
-      impulseControl: stopAccuracy
+        const ssrt = calculateSSRT();
+        elements.finalSummary.innerHTML = `
+            <div class="stat-card"><div class="value">${ssrt}ms</div><div class="label">SSRT</div></div>
+            <div class="stat-card"><div class="value">${getAccuracy(state.goSuccessCount, state.goTotalCount)}%</div><div class="label">Go Accuracy</div></div>
+            <div class="stat-card"><div class="value">${getAccuracy(state.stopSuccessCount, state.stopTotalCount)}%</div><div class="label">Stop Accuracy</div></div>
+            <div class="stat-card"><div class="value">${config.totalTrials}</div><div class="label">Total Trials</div></div>
+        `;
+        elements.finalResultsModal.style.display = 'flex';
+        sendEventsToBackend();
     }
-  };
-  fetch('{% url "games:save_game_result" %}', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-    },
-    body: JSON.stringify(gameData)
-  })
-  .then(response => response.json())
-  .then(data => {
-    console.log('Game result saved:', data);
-  })
-  .catch(error => {
-    console.error('Error saving game result:', error);
-  });
-}
 
-document.addEventListener('DOMContentLoaded', function() {
-  setGameState('waiting');
-  // Only attach the event listener once
-  if (!window._stopSignalKeyListenerAttached) {
-    document.addEventListener('keydown', handleKeyPress);
-    window._stopSignalKeyListenerAttached = true;
-  }
+    async function quitGame(e) {
+        e.preventDefault();
+        if (state.isSaving) return;
+
+        const targetUrl = elements.gameBody.dataset.gameListUrl;
+        if (state.gameStartTime && !state.gameCompleted) {
+            endGame(false);
+            await sendEventsToBackend();
+        }
+        window.location.href = targetUrl;
+    }
+
+    // --- UI & HELPERS ---
+    function displayGoSignal(direction) {
+        const arrow = direction === 'left' ? '←' : '→';
+        elements.stimulusArea.innerHTML = `<div style="color: var(--go-color)">${arrow}</div>`;
+    }
+
+    function displayStopSignal() {
+        const arrow = state.currentStimulus.direction === 'left' ? '←' : '→';
+        elements.stimulusArea.innerHTML = `<div style="color: var(--stop-color)">${arrow}</div>`;
+    }
+
+    function updateDashboard() {
+        elements.trialCount.textContent = `${state.currentTrial}/${config.totalTrials}`;
+        elements.ssrt.textContent = `${calculateSSRT()}ms`;
+        elements.goAccuracy.textContent = `${getAccuracy(state.goSuccessCount, state.goTotalCount)}%`;
+        elements.stopAccuracy.textContent = `${getAccuracy(state.stopSuccessCount, state.stopTotalCount)}%`;
+    }
+
+    function calculateSSRT() {
+        if (state.goRTs.length === 0) return '-';
+        const sortedRTs = [...state.goRTs].sort((a, b) => a - b);
+        const stopFailRate = state.stopTotalCount > 0 ? (state.stopTotalCount - state.stopSuccessCount) / state.stopTotalCount : 0;
+        const quantileIndex = Math.floor(sortedRTs.length * stopFailRate);
+        const quantileRT = sortedRTs[quantileIndex] || sortedRTs[sortedRTs.length - 1];
+        const meanSSD = state.events.filter(e => e.event_type === 'trial_response' && e.type === 'stop').reduce((acc, e) => acc + e.new_ssd, 0) / state.stopTotalCount || state.ssd;
+        return Math.round(quantileRT - meanSSD);
+    }
+
+    function getAccuracy(success, total) {
+        return total > 0 ? Math.round((success / total) * 100) : '-';
+    }
+
+    function clearTimeouts() {
+        state.timeouts.forEach(clearTimeout);
+        state.timeouts = [];
+    }
+
+    // --- DATA & BACKEND ---
+    function logEvent(type, data = {}) {
+        state.events.push({
+            event_type: type,
+            timestamp_ms: performance.now() - state.gameStartTime,
+            ...data
+        });
+    }
+
+    function sendEventsToBackend() {
+        if (state.isSaving || !state.gameStartTime) return Promise.resolve();
+        state.isSaving = true;
+
+        const duration = Math.round((performance.now() - state.gameStartTime) / 1000);
+        const csrfToken = elements.gameBody.dataset.csrfToken;
+        const ssrt = calculateSSRT();
+
+        const payload = {
+            game_type: 'inhibitory_control',
+            score: ssrt > 0 ? Math.max(0, 500 - ssrt) : 0, // Score inversely related to SSRT
+            duration: duration,
+            completion_status: state.gameCompleted ? 'completed' : 'abandoned',
+            raw_data: { 
+                events: state.events,
+                final_ssrt: ssrt,
+                go_accuracy: getAccuracy(state.goSuccessCount, state.goTotalCount),
+                stop_accuracy: getAccuracy(state.stopSuccessCount, state.stopTotalCount),
+                config: config
+            }
+        };
+
+        return fetch('/games/save-result/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+            body: JSON.stringify(payload)
+        })
+        .catch(err => console.error('Error saving game data:', err))
+        .finally(() => { state.isSaving = false; });
+    }
+
+    // --- INITIALIZATION ---
+    initGame();
 });
-
-document.getElementById('back-to-games').onclick = function() {
-    document.getElementById('back-to-games').disabled = true;
-    if (gameState !== 'finished') {
-        endGame();
-        setTimeout(() => { window.location.href = '{% url 'games:game_list' %}'; }, 500);
-    } else {
-        // Game is completed, ensure data is saved before redirecting
-        // Add a small delay to ensure any pending save operations complete
-        setTimeout(() => {
-            window.location.href = '{% url 'games:game_list' %}';
-        }, 1000);
-    }
-};
 </script>
-
-{% csrf_token %}
-{% endblock %} 
+{% endblock %}

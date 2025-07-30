@@ -1,209 +1,371 @@
 {% extends 'base.html' %}
-
-{% block title %}Memory Cards Game - Rasmetric{% endblock %}
-
+{% load static %}
 {% block content %}
-<div class="min-h-screen bg-gray-50">
-  <div class="max-w-4xl mx-auto px-4 py-8">
-    <button
-      onclick="window.location.href='{% url 'games:game_list' %}'"
-      class="flex items-center text-gray-600 hover:text-gray-900 mb-6"
-    >
-      <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-      </svg>
-      Back to Games
-    </button>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+<style>
+    :root {
+        --primary-color: #818CF8; /* Indigo 400 */
+        --success-color: #34D399; /* Green 400 */
+        --danger-color: #F87171; /* Red 400 */
+        --background-color: #0F172A; /* Slate 900 */
+        --surface-color: #1E293B; /* Slate 800 */
+        --text-color: #F1F5F9; /* Slate 100 */
+        --muted-text-color: #94A3B8; /* Slate 400 */
+        --border-color: #334155; /* Slate 700 */
+    }
+    .game-body { background-color: var(--background-color); color: var(--text-color); font-family: 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 1rem; }
+    .game-container { background-color: var(--surface-color); border-radius: 12px; border: 1px solid var(--border-color); box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3); width: 100%; max-width: 900px; overflow: hidden; }
+    .game-header { background-color: rgba(0,0,0,0.2); padding: 1.5rem; text-align: center; border-bottom: 1px solid var(--border-color); }
+    .game-header h2 { font-size: 1.75rem; font-weight: bold; margin: 0; }
+    .dashboard { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; padding: 1.5rem; border-bottom: 1px solid var(--border-color); }
+    .stat-card { background-color: rgba(0,0,0,0.2); padding: 1rem; border-radius: 8px; text-align: center; }
+    .stat-card .value { font-size: 1.75rem; font-weight: bold; color: var(--primary-color); }
+    .stat-card .label { font-size: 0.8rem; color: var(--muted-text-color); text-transform: uppercase; font-weight: 600; }
+    .game-area { padding: 2rem; }
+    #card-grid { display: grid; gap: 1rem; justify-content: center; }
+    .card { width: 100px; height: 100px; perspective: 1000px; background-color: transparent; cursor: pointer; }
+    .card-inner { position: relative; width: 100%; height: 100%; transition: transform 0.6s; transform-style: preserve-3d; }
+    .card.flipped .card-inner { transform: rotateY(180deg); }
+    .card-face { position: absolute; width: 100%; height: 100%; -webkit-backface-visibility: hidden; backface-visibility: hidden; display: flex; justify-content: center; align-items: center; font-size: 3rem; border-radius: 8px; border: 1px solid var(--border-color); }
+    .card-front { background-color: var(--primary-color); }
+    .card-back { background-color: var(--surface-color); color: var(--text-color); transform: rotateY(180deg); }
+    .card.matched .card-back { background-color: var(--success-color); border-color: var(--success-color); animation: pulse 0.5s; }
+    .card.mismatched .card-back { background-color: var(--danger-color); border-color: var(--danger-color); animation: shake 0.5s; }
+    @keyframes pulse { 0%, 100% { transform: rotateY(180deg) scale(1); } 50% { transform: rotateY(180deg) scale(1.05); } }
+    @keyframes shake { 0%, 100% { transform: rotateY(180deg) translateX(0); } 25% { transform: rotateY(180deg) translateX(-5px); } 75% { transform: rotateY(180deg) translateX(5px); } }
+    .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); justify-content: center; align-items: center; }
+    .modal-content { background-color: var(--surface-color); padding: 2.5rem; border-radius: 12px; border: 1px solid var(--border-color); max-width: 500px; width: 90%; box-shadow: 0 5px 15px rgba(0,0,0,0.5); animation: modal-pop 0.3s ease-out; text-align: center; }
+    @keyframes modal-pop { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    .btn { padding: 0.75rem 2rem; border: none; border-radius: 8px; font-size: 1rem; font-weight: bold; cursor: pointer; transition: all 0.2s; background-color: var(--primary-color); color: var(--text-color); }
+    #back-to-games-btn { position: absolute; top: 20px; left: 20px; background-color: rgba(0, 0, 0, 0.3); color: var(--text-color); padding: 0.5rem 1rem; border-radius: 8px; text-decoration: none; font-weight: bold; z-index: 10; }
+</style>
 
-    <div id="gameContainer" class="text-center">
-      <h2 class="text-2xl font-bold text-gray-900 mb-4">Memory Cards</h2>
-      <div class="bg-white rounded-lg shadow-sm p-8 mb-6">
-        <div class="flex justify-between items-center mb-6">
-          <div>
-            <p class="text-sm text-gray-600">Moves: <span id="movesDisplay">0</span></p>
-            <p class="text-sm text-gray-600">Matches: <span id="matchesDisplay">0</span>/8</p>
-          </div>
-          <div class="text-right">
-            <p class="text-sm text-gray-600">Time: <span id="timeDisplay">0</span>s</p>
-          </div>
+<div class="game-body" data-game-list-url="{% url 'games:game_list' %}" data-csrf-token="{{ csrf_token }}">
+    <a href="#" id="back-to-games-btn"><i class="fas fa-arrow-left"></i> Back to Games</a>
+
+    <div class="game-container">
+        <div class="game-header"><h2>Spatial Working Memory Challenge</h2></div>
+        <div class="dashboard">
+            <div class="stat-card"><div id="level-display" class="value">1</div><div class="label">Level</div></div>
+            <div class="stat-card"><div id="accuracy-display" class="value">100%</div><div class="label">Accuracy</div></div>
+            <div class="stat-card"><div id="moves-display" class="value">0</div><div class="label">Moves</div></div>
+            <div class="stat-card"><div id="timer-display" class="value">0s</div><div class="label">Time</div></div>
         </div>
-        <div class="grid grid-cols-4 gap-4 max-w-lg mx-auto" id="cardsGrid">
-          <!-- Cards will be rendered here -->
-        </div>
-      </div>
+        <div class="game-area"><div id="card-grid"></div></div>
     </div>
 
-    <div id="gameOverContainer" class="text-center hidden">
-      <h2 class="text-2xl font-bold text-gray-900 mb-4">Game Complete!</h2>
-      <div class="bg-blue-50 rounded-lg p-6 mb-6">
-        <p class="text-lg text-gray-700 mb-2">Moves: <span id="finalMoves" class="font-bold text-blue-600">0</span></p>
-        <p class="text-lg text-gray-700 mb-2">Time: <span id="finalTime" class="font-bold text-blue-600">0</span>s</p>
-        <p class="text-sm text-gray-600">Efficiency Score: <span id="finalEfficiency">0</span></p>
-      </div>
-      <button
-        onclick="window.location.href='{% url 'games:game_list' %}'"
-        class="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700"
-      >
-        Continue
-      </button>
+    <!-- Modals -->
+    <div id="instruction-modal" class="modal" style="display: flex;">
+        <div class="modal-content">
+            <h3 style="font-size: 1.5rem; font-weight: bold; color: var(--primary-color);">Welcome to the Spatial Working Memory Challenge!</h3>
+            <p style="margin: 1rem 0;">Your goal is to find all matching pairs of cards. The difficulty will adapt based on your performance. Clear each level as quickly and accurately as possible. Good luck!</p>
+            <button id="start-game-btn" class="btn">Start Challenge</button>
+        </div>
     </div>
-  </div>
+    <div id="level-result-modal" class="modal">
+        <div class="modal-content">
+            <h3 id="level-result-title" style="font-size: 1.5rem; font-weight: bold;"></h3>
+            <p id="level-result-summary"></p>
+            <button id="next-level-btn" class="btn">Next Level</button>
+        </div>
+    </div>
+    <div id="final-results-modal" class="modal">
+        <div class="modal-content">
+            <h3 style="font-size: 1.5rem; font-weight: bold;">Challenge Complete!</h3>
+            <div id="final-summary" style="margin: 1.5rem 0; font-size: 1.1rem; display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; text-align: left;"></div>
+            <button id="return-to-games-final-btn" class="btn">Return to Games</button>
+        </div>
+    </div>
 </div>
 
 <script>
-const cardValues = ['🎯', '🎪', '🎨', '🎭', '🎪', '🎯', '🎨', '🎭'];
-let cards = [];
-let flippedCards = [];
-let moves = 0;
-let matches = 0;
-let gameOver = false;
-let startTime = Date.now();
-let timerInterval = null;
-let reactionTimes = [];
-let decisions = [];
+document.addEventListener('DOMContentLoaded', () => {
+    // --- CONFIGURATION ---
+    const GAME_ID = 'memory_cards';
+    const ICONS = ['fa-star', 'fa-heart', 'fa-cloud', 'fa-moon', 'fa-sun', 'fa-snowflake', 'fa-anchor', 'fa-bell', 'fa-bomb', 'fa-bolt', 'fa-camera', 'fa-coffee', 'fa-key', 'fa-lightbulb', 'fa-plane', 'fa-rocket', 'fa-shield-halved', 'fa-tree', 'fa-trophy', 'fa-umbrella'];
+    const LEVEL_CONFIGS = [
+        { level: 1, rows: 2, cols: 2 }, // 2 pairs
+        { level: 2, rows: 2, cols: 3 }, // 3 pairs
+        { level: 3, rows: 2, cols: 4 }, // 4 pairs
+        { level: 4, rows: 3, cols: 4 }, // 6 pairs
+        { level: 5, rows: 4, cols: 4 }, // 8 pairs
+        { level: 6, rows: 4, cols: 5 }, // 10 pairs
+        { level: 7, rows: 5, cols: 4 }, // 10 pairs
+        { level: 8, rows: 5, cols: 6 }, // 15 pairs
+        { level: 9, rows: 6, cols: 6 }, // 18 pairs
+    ];
+    const ACCURACY_THRESHOLD_UP = 0.8; // Need 80% accuracy to advance
+    const ACCURACY_THRESHOLD_DOWN = 0.5; // Drop below 50% to go down a level
 
-function shuffle(array) {
-  return array.sort(() => Math.random() - 0.5);
-}
+    // --- DOM Elements ---
+    const gameBody = document.querySelector('.game-body');
+    const cardGrid = document.getElementById('card-grid');
+    const levelDisplay = document.getElementById('level-display');
+    const accuracyDisplay = document.getElementById('accuracy-display');
+    const movesDisplay = document.getElementById('moves-display');
+    const timerDisplay = document.getElementById('timer-display');
+    const instructionModal = document.getElementById('instruction-modal');
+    const levelResultModal = document.getElementById('level-result-modal');
+    const finalResultsModal = document.getElementById('final-results-modal');
+    const startGameBtn = document.getElementById('start-game-btn');
+    const nextLevelBtn = document.getElementById('next-level-btn');
+    const backToGamesBtn = document.getElementById('back-to-games-btn');
+    const returnToGamesFinalBtn = document.getElementById('return-to-games-final-btn');
 
-function initializeGame() {
-  const values = shuffle([...cardValues, ...cardValues]);
-  cards = values.map((value, index) => ({
-    id: index,
-    value: value,
-    isFlipped: false,
-    isMatched: false
-  }));
-  moves = 0;
-  matches = 0;
-  flippedCards = [];
-  gameOver = false;
-  startTime = Date.now();
-  reactionTimes = [];
-  decisions = [];
-  renderCards();
-  updateStats();
-  if (timerInterval) clearInterval(timerInterval);
-  timerInterval = setInterval(updateTimer, 1000);
-}
+    // --- GAME STATE ---
+    let state = {};
 
-function renderCards() {
-  const grid = document.getElementById('cardsGrid');
-  grid.innerHTML = '';
-  cards.forEach(card => {
-    const btn = document.createElement('button');
-    btn.className = `h-20 w-20 rounded-lg text-2xl font-bold transition-all duration-300 ${
-      card.isFlipped || card.isMatched
-        ? 'bg-white border-2 border-blue-500 text-gray-900'
-        : 'bg-blue-600 hover:bg-blue-700 text-white'
-    }`;
-    btn.textContent = card.isFlipped || card.isMatched ? card.value : '?';
-    btn.disabled = card.isFlipped || card.isMatched || flippedCards.length >= 2;
-    btn.onclick = () => handleCardClick(card.id);
-    grid.appendChild(btn);
-  });
-}
+    const resetState = () => {
+        state = {
+            currentLevelIndex: 0,
+            moves: 0,
+            matchesFound: 0,
+            totalPairs: 0,
+            flippedCards: [],
+            isLocked: false,
+            timer: null,
+            seconds: 0,
+            events: [],
+            gameStartTime: 0,
+            levelStartTime: 0,
+            gameCompleted: false,
+        };
+    };
 
-function handleCardClick(cardId) {
-  if (flippedCards.length >= 2) return;
-  const reactionTime = Date.now() - startTime;
-  reactionTimes.push(reactionTime);
-  const card = cards.find(c => c.id === cardId);
-  if (!card || card.isFlipped || card.isMatched) return;
-  card.isFlipped = true;
-  flippedCards.push(cardId);
-  decisions.push({
-    cardId: cardId,
-    value: card.value,
-    move: moves + 1,
-    reactionTime: reactionTime
-  });
-  renderCards();
-  if (flippedCards.length === 2) {
-    setTimeout(() => checkMatch(), 1000);
-  }
-}
+    // --- HELPER FUNCTIONS ---
+    const shuffle = (array) => array.sort(() => Math.random() - 0.5);
+    const logEvent = (type, details = {}) => {
+        const event = {
+            type: type,
+            level: state.currentLevelIndex + 1,
+            timestamp: Date.now() - state.gameStartTime,
+            ...details
+        };
+        state.events.push(event);
+    };
 
-function checkMatch() {
-  const [id1, id2] = flippedCards;
-  const card1 = cards.find(c => c.id === id1);
-  const card2 = cards.find(c => c.id === id2);
-  if (card1 && card2 && card1.value === card2.value) {
-    card1.isMatched = true;
-    card2.isMatched = true;
-    matches++;
-    if (matches === 8) {
-      endGame();
-      return;
-    }
-  } else {
-    card1.isFlipped = false;
-    card2.isFlipped = false;
-  }
-  flippedCards = [];
-  moves++;
-  renderCards();
-  updateStats();
-}
+    // --- GAME LOGIC ---
+    const startGame = () => {
+        resetState();
+        state.gameStartTime = Date.now();
+        logEvent('game_start');
+        instructionModal.style.display = 'none';
+        startLevel();
+    };
 
-function updateStats() {
-  document.getElementById('movesDisplay').textContent = moves;
-  document.getElementById('matchesDisplay').textContent = matches;
-}
+    const startLevel = () => {
+        state.isLocked = true;
+        state.levelStartTime = Date.now();
+        const config = LEVEL_CONFIGS[state.currentLevelIndex];
+        state.totalPairs = (config.rows * config.cols) / 2;
+        state.matchesFound = 0;
+        state.moves = 0;
+        state.flippedCards = [];
 
-function updateTimer() {
-  const time = Math.round((Date.now() - startTime) / 1000);
-  document.getElementById('timeDisplay').textContent = time;
-}
+        updateDashboard();
+        logEvent('level_start', { rows: config.rows, cols: config.cols, pairs: state.totalPairs });
 
-function endGame() {
-  gameOver = true;
-  clearInterval(timerInterval);
-  document.getElementById('gameContainer').classList.add('hidden');
-  document.getElementById('gameOverContainer').classList.remove('hidden');
-  document.getElementById('finalMoves').textContent = moves;
-  document.getElementById('finalTime').textContent = Math.round((Date.now() - startTime) / 1000);
-  const efficiency = Math.max(0, 100 - (moves * 5));
-  document.getElementById('finalEfficiency').textContent = efficiency;
-  saveGameResult(efficiency);
-}
+        const iconsForLevel = shuffle([...ICONS]).slice(0, state.totalPairs);
+        const cards = shuffle([...iconsForLevel, ...iconsForLevel]);
 
-function saveGameResult(efficiency) {
-  const totalTime = Date.now() - startTime;
-  const gameData = {
-    game_type: 'memory_cards',
-    score: Math.min(efficiency, 100),
-    duration: totalTime,
-    decisions: decisions,
-    reaction_times: reactionTimes,
-    raw_data: {
-      moves: moves,
-      matches: matches,
-      efficiency: efficiency,
-      average_reaction_time: reactionTimes.length ? reactionTimes.reduce((a, b) => a + b, 0) / reactionTimes.length : 0
-    }
-  };
-  fetch('{% url "games:save_game_result" %}', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-    },
-    body: JSON.stringify(gameData)
-  })
-  .then(response => response.json())
-  .then(data => {
-    console.log('Game result saved:', data);
-  })
-  .catch(error => {
-    console.error('Error saving game result:', error);
-  });
-}
+        cardGrid.innerHTML = '';
+        cardGrid.style.gridTemplateColumns = `repeat(${config.cols}, 100px)`;
+        cards.forEach((icon, index) => cardGrid.appendChild(createCard(icon, index)));
 
-document.addEventListener('DOMContentLoaded', function() {
-  initializeGame();
+        setTimeout(() => { state.isLocked = false; startTimer(); }, 500);
+    };
+
+    const createCard = (icon, id) => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.dataset.id = id;
+        card.dataset.icon = icon;
+        card.innerHTML = `
+            <div class="card-inner">
+                <div class="card-face card-front"></div>
+                <div class="card-face card-back"><i class="fas ${icon}"></i></div>
+            </div>
+        `;
+        card.addEventListener('click', () => handleCardClick(card));
+        return card;
+    };
+
+    const handleCardClick = (card) => {
+        if (state.isLocked || card.classList.contains('flipped') || card.classList.contains('matched')) return;
+
+        state.isLocked = true;
+        card.classList.add('flipped');
+        state.flippedCards.push(card);
+        logEvent('card_flip', { cardId: card.dataset.id, icon: card.dataset.icon });
+
+        if (state.flippedCards.length === 2) {
+            state.moves++;
+            updateDashboard();
+            checkForMatch();
+        } else {
+            state.isLocked = false;
+        }
+    };
+
+    const checkForMatch = () => {
+        const [card1, card2] = state.flippedCards;
+        if (card1.dataset.icon === card2.dataset.icon) {
+            handleMatch(card1, card2);
+        } else {
+            handleMismatch(card1, card2);
+        }
+    };
+
+    const handleMatch = (card1, card2) => {
+        state.matchesFound++;
+        card1.classList.add('matched');
+        card2.classList.add('matched');
+        logEvent('match_found', { icon: card1.dataset.icon, cardIds: [card1.dataset.id, card2.dataset.id] });
+        state.flippedCards = [];
+        if (state.matchesFound === state.totalPairs) {
+            setTimeout(handleLevelComplete, 500);
+        } else {
+            state.isLocked = false;
+        }
+    };
+
+    const handleMismatch = (card1, card2) => {
+        logEvent('mismatch', { icon1: card1.dataset.icon, icon2: card2.dataset.icon, cardIds: [card1.dataset.id, card2.dataset.id] });
+        card1.classList.add('mismatched');
+        card2.classList.add('mismatched');
+        setTimeout(() => {
+            card1.classList.remove('flipped', 'mismatched');
+            card2.classList.remove('flipped', 'mismatched');
+            state.flippedCards = [];
+            state.isLocked = false;
+        }, 1000);
+    };
+
+    const handleLevelComplete = () => {
+        stopTimer();
+        const levelDuration = (Date.now() - state.levelStartTime) / 1000;
+        const accuracy = state.totalPairs / state.moves;
+        logEvent('level_complete', { duration: levelDuration, moves: state.moves, accuracy: accuracy });
+
+        const resultTitle = document.getElementById('level-result-title');
+        const resultSummary = document.getElementById('level-result-summary');
+
+        if (accuracy >= ACCURACY_THRESHOLD_UP) {
+            resultTitle.textContent = 'Level Cleared!';
+            resultTitle.style.color = 'var(--success-color)';
+            resultSummary.textContent = `Accuracy: ${(accuracy * 100).toFixed(0)}%. Advancing to the next level.`;
+            state.currentLevelIndex++;
+        } else {
+            resultTitle.textContent = 'Level Repeated';
+            resultTitle.style.color = 'var(--warning-color)';
+            resultSummary.textContent = `Accuracy: ${(accuracy * 100).toFixed(0)}%. Let's try this level again.`;
+            if (accuracy < ACCURACY_THRESHOLD_DOWN && state.currentLevelIndex > 0) {
+                 state.currentLevelIndex--; // Adaptive: move down a level
+                 resultSummary.textContent += ' Difficulty has been reduced.';
+            }
+        }
+
+        if (state.currentLevelIndex >= LEVEL_CONFIGS.length) {
+            endGame(true);
+        } else {
+            levelResultModal.style.display = 'flex';
+        }
+    };
+
+    const endGame = (completed) => {
+        state.gameCompleted = completed;
+        stopTimer();
+        displayFinalResults();
+        finalResultsModal.style.display = 'flex';
+        sendDataToBackend();
+    };
+
+    // --- UI & Timers ---
+    const updateDashboard = () => {
+        levelDisplay.textContent = state.currentLevelIndex + 1;
+        movesDisplay.textContent = state.moves;
+        const accuracy = state.moves > 0 ? (state.matchesFound / state.moves * 100) : 100;
+        accuracyDisplay.textContent = `${accuracy.toFixed(0)}%`;
+    };
+
+    const startTimer = () => {
+        state.seconds = 0;
+        timerDisplay.textContent = '0s';
+        state.timer = setInterval(() => {
+            state.seconds++;
+            timerDisplay.textContent = `${state.seconds}s`;
+        }, 1000);
+    };
+
+    const stopTimer = () => clearInterval(state.timer);
+
+    const displayFinalResults = () => {
+        const totalDuration = (Date.now() - state.gameStartTime) / 1000;
+        const totalMoves = state.events.filter(e => e.type === 'card_flip').length / 2;
+        const totalMatches = state.events.filter(e => e.type === 'match_found').length;
+        const overallAccuracy = totalMoves > 0 ? (totalMatches / totalMoves * 100) : 100;
+
+        document.getElementById('final-summary').innerHTML = `
+            <div><strong>Highest Level Reached:</strong></div><div>${state.currentLevelIndex + 1}</div>
+            <div><strong>Overall Accuracy:</strong></div><div>${overallAccuracy.toFixed(1)}%</div>
+            <div><strong>Total Moves:</strong></div><div>${totalMoves.toFixed(0)}</div>
+            <div><strong>Total Time:</strong></div><div>${totalDuration.toFixed(1)}s</div>
+        `;
+    };
+
+    // --- DATA HANDLING ---
+    const sendDataToBackend = () => {
+        const completionStatus = state.gameCompleted ? 'completed' : 'abandoned';
+        const totalDuration = Date.now() - state.gameStartTime;
+        const totalMoves = state.events.filter(e => e.type === 'card_flip').length / 2;
+        const score = Math.max(0, (state.currentLevelIndex * 1000) - totalMoves * 10 - Math.floor(totalDuration / 1000));
+
+        const data = {
+            game_name: GAME_ID,
+            score: score,
+            duration_ms: totalDuration,
+            completion_status: completionStatus,
+            events: state.events,
+            game_specific_data: {
+                highest_level: state.currentLevelIndex + 1,
+                total_moves: totalMoves,
+                levels_completed: state.currentLevelIndex,
+            }
+        };
+
+        return fetch('{% url "games:save_score" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': gameBody.dataset.csrfToken,
+            },
+            body: JSON.stringify(data),
+        });
+    };
+
+    const quitGame = () => {
+        if (state.gameStartTime === 0) {
+            window.location.href = gameBody.dataset.gameListUrl;
+            return;
+        }
+        if (finalResultsModal.style.display === 'flex') {
+             window.location.href = gameBody.dataset.gameListUrl;
+             return;
+        }
+        state.gameCompleted = false;
+        sendDataToBackend().finally(() => {
+            window.location.href = gameBody.dataset.gameListUrl;
+        });
+    };
+
+    // --- Event Listeners ---
+    startGameBtn.addEventListener('click', startGame);
+    nextLevelBtn.addEventListener('click', () => {
+        levelResultModal.style.display = 'none';
+        startLevel();
+    });
+    backToGamesBtn.addEventListener('click', (e) => { e.preventDefault(); quitGame(); });
+    returnToGamesFinalBtn.addEventListener('click', (e) => { e.preventDefault(); window.location.href = gameBody.dataset.gameListUrl; });
 });
 </script>
-
-{% csrf_token %}
-{% endblock %} 
+{% endblock %}

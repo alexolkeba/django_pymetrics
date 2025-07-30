@@ -1,162 +1,393 @@
 {% extends 'base.html' %}
+{% load static %}
 {% block content %}
-<div class="max-w-lg mx-auto mt-4">
-    <button id="back-to-games" class="inline-block mb-4 px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300">← Back to Games</button>
-</div>
-<div class="game-container max-w-lg mx-auto mt-8 p-6 bg-white rounded shadow">
-    <h2 class="text-2xl font-bold mb-2">Letters Game</h2>
-    <p class="mb-4">Type the letter shown as quickly and accurately as possible. Try to maximize your score over <span id="total-rounds">10</span> rounds.</p>
-    <div id="game-area">
-        <div id="round-info" class="mb-2 font-semibold">Round <span id="round-num">1</span> of <span id="total-rounds-2">10</span></div>
-        <div class="mb-2">Target letter: <span id="target-letter" class="font-mono text-lg"></span></div>
-        <label for="letter-input" class="block mb-1">Enter the letter:</label>
-        <input type="text" id="letter-input" maxlength="1" class="border rounded px-2 py-1 mb-2 w-full" autocomplete="off" />
-        <button id="submit-letter" class="bg-blue-500 text-white px-4 py-2 rounded">Submit</button>
-        <div id="feedback" class="mt-3 text-green-600 font-semibold"></div>
+<style>
+    :root {
+        --primary-color: #4F46E5;
+        --secondary-color: #10B981;
+        --background-color: #111827; /* Dark background */
+        --text-color: #F3F4F6;
+        --container-bg: #1F2937; /* Dark container */
+        --success-color: #10B981;
+        --error-color: #EF4444;
+    }
+    .game-body {
+        background-color: var(--background-color);
+        color: var(--text-color);
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        padding: 1rem;
+    }
+    .game-container {
+        background-color: var(--container-bg);
+        border-radius: 12px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+        width: 100%;
+        max-width: 800px;
+        overflow: hidden;
+    }
+    .game-header {
+        background-color: var(--primary-color);
+        color: white;
+        padding: 1rem 1.5rem;
+        text-align: center;
+    }
+    .dashboard {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 1rem;
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid #374151;
+    }
+    .stat-card {
+        background-color: #374151;
+        padding: 0.75rem;
+        border-radius: 8px;
+        text-align: center;
+    }
+    .stat-card .value {
+        font-size: 1.5rem;
+        font-weight: bold;
+        color: var(--secondary-color);
+    }
+    .stat-card .label {
+        font-size: 0.875rem;
+        color: #9CA3AF;
+    }
+    .game-canvas-container {
+        padding: 1rem;
+    }
+    #game-canvas {
+        background-color: #111827;
+        border-radius: 8px;
+        width: 100%;
+        height: 400px;
+        position: relative;
+        overflow: hidden;
+        cursor: crosshair;
+    }
+    .target-letter {
+        position: absolute;
+        font-size: 2rem;
+        font-weight: bold;
+        color: #F3F4F6;
+        padding: 0.5rem 1rem;
+        background-color: rgba(79, 70, 229, 0.8);
+        border-radius: 50%;
+        user-select: none;
+        animation: fade-in 0.3s;
+    }
+    @keyframes fade-in {
+        from { opacity: 0; transform: scale(0.5); }
+        to { opacity: 1; transform: scale(1); }
+    }
+    .modal {
+        display: none;
+        position: fixed;
+        z-index: 1000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0,0,0,0.7);
+        justify-content: center;
+        align-items: center;
+    }
+    .modal-content {
+        background-color: var(--container-bg);
+        padding: 2rem;
+        border-radius: 12px;
+        max-width: 500px;
+        width: 90%;
+        text-align: center;
+    }
+    .btn {
+        padding: 0.75rem 1.5rem;
+        border: none;
+        border-radius: 8px;
+        font-size: 1rem;
+        font-weight: bold;
+        cursor: pointer;
+        color: white;
+        background-color: var(--primary-color);
+    }
+    #back-to-games {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        background-color: rgba(55, 65, 81, 0.8);
+        color: var(--text-color);
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        text-decoration: none;
+        font-weight: bold;
+        z-index: 10;
+    }
+</style>
+
+<div class="game-body">
+    <a href="/games/" id="back-to-games">← Back to Games</a>
+
+    <div class="game-container">
+        <div class="game-header">
+            <h2>Cognitive Reflex Test</h2>
+        </div>
+
+        <!-- Dashboard -->
+        <div class="dashboard">
+            <div class="stat-card">
+                <div id="score" class="value">0</div>
+                <div class="label">Score</div>
+            </div>
+            <div class="stat-card">
+                <div id="accuracy" class="value">100%</div>
+                <div class="label">Accuracy</div>
+            </div>
+            <div class="stat-card">
+                <div id="avg-reaction" class="value">- ms</div>
+                <div class="label">Avg. Reaction</div>
+            </div>
+            <div class="stat-card">
+                <div id="level" class="value">1</div>
+                <div class="label">Level</div>
+            </div>
+        </div>
+
+        <!-- Game Canvas -->
+        <div class="game-canvas-container">
+            <div id="game-canvas">
+                <!-- Letters will be spawned here -->
+            </div>
+        </div>
     </div>
 
+    <!-- Instruction Modal -->
+    <div id="instruction-modal" class="modal" style="display: flex;">
+        <div class="modal-content">
+            <h3 style="font-size: 1.5rem; font-weight: bold; color: var(--primary-color);">Cognitive Reflex Test</h3>
+            <p style="margin-top: 1rem;">Letters will appear on the screen. Press the corresponding key as quickly as you can.</p>
+            <p style="margin-top: 1rem;">The game gets faster as you succeed. Stay focused!</p>
+            <p style="margin-top: 1rem;">The game lasts for 90 seconds. Maximize your score.</p>
+            <button id="start-game-btn" class="btn" style="margin-top: 1.5rem;">Start Game</button>
+        </div>
+    </div>
+
+    <!-- Final Results Modal -->
+    <div id="final-results-modal" class="modal">
+        <div class="modal-content">
+            <h3 style="font-size: 1.5rem; font-weight: bold; color: var(--primary-color);">Game Over!</h3>
+            <div id="final-score" style="font-size: 2rem; font-weight: bold; margin: 1rem 0;"></div>
+            <p id="final-summary" style="margin-bottom: 1.5rem;"></p>
+            <a href="/games/" class="btn">Return to Games</a>
+        </div>
+    </div>
 </div>
+
 <script>
-const TOTAL_ROUNDS = 10;
-let currentRound = 1;
-let score = 0;
-let events = [];
-let startTime = null;
-let targetLetter = '';
-let difficulty = 'medium'; // Placeholder for dynamic difficulty
+document.addEventListener('DOMContentLoaded', () => {
+    // Game Elements
+    const gameCanvas = document.getElementById('game-canvas');
+    const scoreEl = document.getElementById('score');
+    const accuracyEl = document.getElementById('accuracy');
+    const avgReactionEl = document.getElementById('avg-reaction');
+    const levelEl = document.getElementById('level');
+    const instructionModal = document.getElementById('instruction-modal');
+    const finalResultsModal = document.getElementById('final-results-modal');
+    const startGameBtn = document.getElementById('start-game-btn');
+    const backToGamesBtn = document.getElementById('back-to-games');
 
-function getRandomLetter() {
-    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    return letters[Math.floor(Math.random() * letters.length)];
-}
+    // Game Configuration
+    const GAME_DURATION = 90000; // 90 seconds
+    const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
-function logEvent(type, data) {
-    events.push({
-        event_type: type,
-        round: currentRound,
-        target: targetLetter,
-        difficulty: difficulty,
-        timestamp: Date.now(),
-        ...data
-    });
-}
+    // Game State
+    let score = 0;
+    let level = 1;
+    let hits = 0;
+    let misses = 0;
+    let totalPresses = 0;
+    let reactionTimes = [];
+    let activeLetters = [];
+    let gameTimer = null;
+    let spawnInterval = null;
+    let gameStartTime = 0;
+    let gameCompleted = false;
+    let eventsLog = [];
 
-function updateUI() {
-    document.getElementById('round-num').textContent = currentRound;
-    document.getElementById('total-rounds').textContent = TOTAL_ROUNDS;
-    document.getElementById('total-rounds-2').textContent = TOTAL_ROUNDS;
-    targetLetter = getRandomLetter();
-    document.getElementById('target-letter').textContent = targetLetter;
-    document.getElementById('letter-input').value = '';
-    document.getElementById('feedback').textContent = '';
-    document.getElementById('letter-input').focus();
-    startTime = Date.now();
-}
-
-document.getElementById('submit-letter').onclick = function() {
-    const input = document.getElementById('letter-input').value.toUpperCase();
-    const reactionTime = Date.now() - startTime;
-    if (!input || input.length !== 1) {
-        document.getElementById('feedback').textContent = 'Please enter a single letter.';
-        return;
-    }
-    if (input === targetLetter) {
-        score++;
-        document.getElementById('feedback').textContent = 'Correct!';
-        logEvent('correct', {input: input, reaction_time: reactionTime});
-    } else {
-        document.getElementById('feedback').textContent = `Incorrect. The correct letter was ${targetLetter}.`;
-        logEvent('incorrect', {input: input, reaction_time: reactionTime});
-    }
-    if (currentRound < TOTAL_ROUNDS) {
-        currentRound++;
-        setTimeout(() => {
-            updateUI();
-        }, 1000);
-    } else {
-        document.getElementById('game-area').innerHTML = `<div class='font-bold text-lg'>Game Over! Final score: ${score} / ${TOTAL_ROUNDS}</div>`;
-        logEvent('end', {final_score: score});
-        // Mark that we're saving to backend to avoid duplicate saves
-        logEvent('backend_saved', {});
-        sendEventsToBackend();
-    }
-};
-
-document.getElementById('back-to-games').onclick = function() {
-    // If game is still active, end session first
-    if (currentRound <= TOTAL_ROUNDS) {
-        logEvent('manual_end', {final_score: score});
-        document.getElementById('submit-letter').disabled = true;
-        document.getElementById('letter-input').disabled = true;
-        document.getElementById('game-area').innerHTML = `<div class='font-bold text-lg text-red-600'>Session Ended! Final score: ${score} / ${TOTAL_ROUNDS}</div>`;
-        // Save data and then redirect
-        sendEventsToBackend().then(() => {
-            window.location.href = '/games/';
-        }).catch(() => {
-            // Even if save fails, still redirect
-            window.location.href = '/games/';
-        });
-    } else {
-        // Game is completed, ensure data is saved before redirecting
-        // Check if we need to save the completed game data
-        if (events.length > 0 && !events.some(e => e.event_type === 'backend_saved')) {
-            // Mark that we're saving to backend to avoid duplicate saves
-            logEvent('backend_saved', {});
-            sendEventsToBackend().then(() => {
-                window.location.href = '/games/';
-            }).catch(() => {
-                // Even if save fails, still redirect
-                window.location.href = '/games/';
-            });
-        } else {
-            // Data already saved or no data to save, safe to redirect
-            window.location.href = '/games/';
-        }
-    }
-};
-
-function sendEventsToBackend() {
-    return fetch('/games/save_game_result/', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': getCookie('csrftoken')
-        },
-        body: JSON.stringify({
-            game_type: 'letters',
-            score: score,
-            duration: TOTAL_ROUNDS * 5, // Placeholder
-            decisions: events.filter(e => e.event_type === 'correct' || e.event_type === 'incorrect'),
-            reaction_times: events.filter(e => e.reaction_time !== undefined).map(e => e.reaction_time),
-            raw_data: {events: events}
-        })
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.success) {
-            console.log('Session saved successfully');
-        } else {
-            console.error('Error saving session: ' + data.error);
-        }
-        return data;
-    });
-}
-
-function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
             }
         }
+        return cookieValue;
     }
-    return cookieValue;
-}
 
-updateUI();
+    function logEvent(type, data) {
+        eventsLog.push({
+            event_type: type,
+            timestamp: Date.now() - gameStartTime,
+            level: level,
+            score: score,
+            ...data
+        });
+    }
+
+    function updateDashboard() {
+        scoreEl.textContent = score;
+        levelEl.textContent = level;
+        const accuracy = totalPresses > 0 ? ((hits / totalPresses) * 100).toFixed(1) : 100;
+        accuracyEl.textContent = `${accuracy}%`;
+        const avgReaction = reactionTimes.length > 0 ? (reactionTimes.reduce((a, b) => a + b, 0) / reactionTimes.length).toFixed(0) : '-';
+        avgReactionEl.textContent = `${avgReaction} ms`;
+    }
+
+    function spawnLetter() {
+        const letter = LETTERS[Math.floor(Math.random() * LETTERS.length)];
+        const letterEl = document.createElement('div');
+        letterEl.className = 'target-letter';
+        letterEl.textContent = letter;
+        letterEl.dataset.char = letter;
+        letterEl.dataset.spawnTime = Date.now();
+
+        const canvasRect = gameCanvas.getBoundingClientRect();
+        const x = Math.random() * (canvasRect.width - 40);
+        const y = Math.random() * (canvasRect.height - 40);
+        letterEl.style.left = `${x}px`;
+        letterEl.style.top = `${y}px`;
+
+        gameCanvas.appendChild(letterEl);
+        activeLetters.push(letterEl);
+        logEvent('spawn', { letter: letter, position: { x, y } });
+    }
+
+    function handleKeyPress(e) {
+        if (gameTimer === null) return; // Game not running
+        const pressedKey = e.key.toUpperCase();
+        if (!LETTERS.includes(pressedKey)) return;
+
+        totalPresses++;
+        const target = activeLetters.find(el => el.dataset.char === pressedKey);
+
+        if (target) {
+            const reactionTime = Date.now() - parseInt(target.dataset.spawnTime);
+            reactionTimes.push(reactionTime);
+            hits++;
+            score += 10 + Math.max(0, 10 - Math.floor(reactionTime / 100)); // Bonus for speed
+            logEvent('hit', { letter: pressedKey, reaction_time: reactionTime });
+
+            target.remove();
+            activeLetters = activeLetters.filter(el => el !== target);
+            
+            // Level up logic
+            if (hits % 10 === 0) {
+                level++;
+                adjustDifficulty();
+            }
+        } else {
+            misses++;
+            score = Math.max(0, score - 5);
+            logEvent('miss', { letter: pressedKey });
+        }
+        updateDashboard();
+    }
+
+    function adjustDifficulty() {
+        clearInterval(spawnInterval);
+        const newInterval = Math.max(300, 1500 - (level * 100));
+        spawnInterval = setInterval(spawnLetter, newInterval);
+        logEvent('level_up', { new_interval: newInterval });
+    }
+
+    function startGame() {
+        instructionModal.style.display = 'none';
+        gameStartTime = Date.now();
+        logEvent('game_start', {});
+
+        gameTimer = setTimeout(endGame, GAME_DURATION);
+        adjustDifficulty();
+
+        document.addEventListener('keydown', handleKeyPress);
+        updateDashboard();
+    }
+
+    function endGame() {
+        gameCompleted = true;
+        clearTimeout(gameTimer);
+        clearInterval(spawnInterval);
+        document.removeEventListener('keydown', handleKeyPress);
+
+        logEvent('game_end', { final_score: score, final_level: level });
+
+        // Display final results
+        document.getElementById('final-score').textContent = `Score: ${score}`;
+        const accuracy = totalPresses > 0 ? ((hits / totalPresses) * 100).toFixed(1) : 100;
+        const avgReaction = reactionTimes.length > 0 ? (reactionTimes.reduce((a, b) => a + b, 0) / reactionTimes.length).toFixed(0) : 'N/A';
+        document.getElementById('final-summary').textContent = `You reached level ${level} with ${accuracy}% accuracy and an average reaction time of ${avgReaction} ms.`;
+        finalResultsModal.style.display = 'flex';
+
+        saveGameResult();
+    }
+
+    function quitGame() {
+        if (gameTimer) {
+            clearTimeout(gameTimer);
+            clearInterval(spawnInterval);
+        }
+        document.removeEventListener('keydown', handleKeyPress);
+        logEvent('game_quit', { final_score: score, final_level: level });
+        
+        const savePromise = saveGameResult();
+        savePromise.finally(() => {
+            window.location.href = '/games/';
+        });
+    }
+
+    function saveGameResult() {
+        const duration = (Date.now() - gameStartTime) / 1000;
+        const payload = {
+            game_type: 'letters_reflex',
+            score: score,
+            duration: duration.toFixed(2),
+            completion_status: gameCompleted ? 'completed' : 'abandoned',
+            raw_data: {
+                level: level,
+                hits: hits,
+                misses: misses,
+                accuracy: totalPresses > 0 ? (hits / totalPresses) : 1,
+                reaction_times: reactionTimes,
+                events: eventsLog
+            }
+        };
+
+        return fetch('/games/save-result/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify(payload)
+        }).then(res => {
+            if (!res.ok) console.error('Failed to save game data.');
+            return res.json();
+        }).catch(error => console.error('Error saving game data:', error));
+    }
+
+    // Event Listeners
+    startGameBtn.addEventListener('click', startGame);
+    backToGamesBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        quitGame();
+    });
+});
 </script>
 {% endblock %}

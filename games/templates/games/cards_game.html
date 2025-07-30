@@ -3,145 +3,274 @@
 <div class="max-w-lg mx-auto mt-4">
     <button id="back-to-games" class="inline-block mb-4 px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300">← Back to Games</button>
 </div>
-<div class="game-container max-w-lg mx-auto mt-8 p-6 bg-white rounded shadow">
-    <h2 class="text-2xl font-bold mb-2">Cards Game (Iowa Gambling)</h2>
-    <p class="mb-4">Pick cards from four decks (A, B, C, D). Some decks are riskier but may offer higher rewards. Try to maximize your total score over <span id="total-rounds">20</span> picks.</p>
-    <div id="game-area">
-        <div id="round-info" class="mb-2 font-semibold">Pick <span id="round-num">1</span> of <span id="total-rounds-2">20</span></div>
-        <div class="mb-2">Current score: <span id="score">0</span></div>
-        <div class="flex space-x-2 mb-2">
-            <button class="deck-btn bg-blue-500 text-white px-4 py-2 rounded" data-deck="A">Deck A</button>
-            <button class="deck-btn bg-green-500 text-white px-4 py-2 rounded" data-deck="B">Deck B</button>
-            <button class="deck-btn bg-yellow-500 text-white px-4 py-2 rounded" data-deck="C">Deck C</button>
-            <button class="deck-btn bg-red-500 text-white px-4 py-2 rounded" data-deck="D">Deck D</button>
-        </div>
-        <div id="feedback" class="mt-3 text-blue-600 font-semibold"></div>
-    </div>
+<style>
+    :root {
+        --bg-color: #1a1a1a;
+        --primary-color: #2c2c2c;
+        --secondary-color: #444;
+        --accent-color: #00aaff;
+        --text-color: #f0f0f0;
+        --gain-color: #4ade80;
+        --loss-color: #f87171;
+    }
+    .game-container {
+        background-color: var(--bg-color);
+        color: var(--text-color);
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        border: 1px solid var(--secondary-color);
+        border-radius: 12px;
+        padding: 2rem;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+    }
+    .dashboard {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 1rem;
+        margin-bottom: 2rem;
+        padding: 1rem;
+        background-color: var(--primary-color);
+        border-radius: 8px;
+    }
+    .metric { text-align: center; }
+    .metric-title { font-size: 0.9rem; color: #aaa; text-transform: uppercase; }
+    .metric-value { font-size: 1.8rem; font-weight: bold; color: var(--accent-color); }
+    #game-area {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+    #decks-container {
+        display: flex;
+        justify-content: center;
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+    .deck {
+        width: 100px;
+        height: 140px;
+        background-color: var(--secondary-color);
+        border: 2px solid #555;
+        border-radius: 8px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: 2rem;
+        font-weight: bold;
+        cursor: pointer;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        position: relative;
+    }
+    .deck:before {
+        content: '';
+        position: absolute;
+        top: 5px; left: 5px; right: 5px; bottom: 5px;
+        border: 2px dashed rgba(255,255,255,0.2);
+        border-radius: 4px;
+    }
+    .deck:hover { transform: translateY(-10px); box-shadow: 0 15px 20px rgba(0,0,0,0.4); }
+    #feedback-area {
+        min-height: 80px;
+        width: 100%;
+        text-align: center;
+        font-size: 1.5rem;
+        font-weight: bold;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+    .feedback-anim {
+        animation: feedback-fade 2s forwards;
+    }
+    @keyframes feedback-fade {
+        0% { opacity: 1; transform: translateY(0); }
+        80% { opacity: 1; transform: translateY(0); }
+        100% { opacity: 0; transform: translateY(-20px); }
+    }
+    .gain { color: var(--gain-color); }
+    .loss { color: var(--loss-color); }
+    .modal { display: flex; position: fixed; z-index: 100; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); justify-content: center; align-items: center; }
+    .modal-content { background-color: var(--primary-color); padding: 2rem; border-radius: 12px; border: 1px solid var(--secondary-color); width: 90%; max-width: 500px; text-align: center; }
+    .modal-content h2 { font-size: 2rem; margin-bottom: 1rem; }
+    .modal-content p { margin-bottom: 1.5rem; color: #ccc; }
+    .modal-btn { background-color: var(--accent-color); color: var(--text-color); padding: 0.8rem 1.5rem; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; transition: background-color 0.2s ease; }
+    .modal-btn:hover { background-color: #0088cc; }
+</style>
 
+<div class="game-container max-w-3xl mx-auto mt-8">
+    <h2 class="text-3xl font-bold mb-4 text-center">Strategic Investment Task</h2>
+    <div class="dashboard">
+        <div class="metric">
+            <div class="metric-title">Net Worth</div>
+            <div id="score" class="metric-value">$2000</div>
+        </div>
+        <div class="metric">
+            <div class="metric-title">Last Gain/Loss</div>
+            <div id="last-outcome" class="metric-value">$0</div>
+        </div>
+        <div class="metric">
+            <div class="metric-title">Pick</div>
+            <div id="round" class="metric-value">1/100</div>
+        </div>
+    </div>
+    <div id="game-area">
+        <div id="decks-container">
+            <div class="deck" data-deck="A">A</div>
+            <div class="deck" data-deck="B">B</div>
+            <div class="deck" data-deck="C">C</div>
+            <div class="deck" data-deck="D">D</div>
+        </div>
+        <div id="feedback-area"></div>
+    </div>
+</div>
+
+<!-- Instruction Modal -->
+<div id="instruction-modal" class="modal">
+    <div class="modal-content">
+        <h2>Strategic Investment Task</h2>
+        <p>Your goal is to maximize your money. You start with a $2000 loan.</p>
+        <p>In each round, choose a card from one of the four decks. Some decks are riskier than others. Try to figure out which decks are best in the long run.</p>
+        <button id="start-game-btn" class="modal-btn">Start Game</button>
+    </div>
+</div>
+
+<!-- Final Results Modal -->
+<div id="final-results-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <h2>Task Complete!</h2>
+        <p id="final-score">Your final net worth: $0</p>
+        <p id="final-summary"></p>
+        <a href="/games/" class="modal-btn">Back to Games</a>
+    </div>
 </div>
 <script>
-const TOTAL_ROUNDS = 20;
-let currentRound = 1;
-let score = 0;
-let events = [];
-let difficulty = 'medium';
+// Game Parameters
+const TOTAL_ROUNDS = 100;
+const STARTING_SCORE = 2000;
 
-// Deck reward/punishment structure (simplified)
-const decks = {
-    'A': {reward: 100, penalty: 250, penaltyChance: 0.5},
-    'B': {reward: 100, penalty: 1250, penaltyChance: 0.1},
-    'C': {reward: 50, penalty: 50, penaltyChance: 0.1},
-    'D': {reward: 50, penalty: 250, penaltyChance: 0.1}
+// State
+let currentRound = 1;
+let score = STARTING_SCORE;
+let events = [];
+let gameCompleted = false;
+let pickStartTime;
+let decksLocked = true;
+
+// Iowa Gambling Task Payoff Structure (standardized)
+// Net per 10 cards: A = -$250, B = -$250, C = +$250, D = +$250
+const deckSchedules = {
+    'A': { reward: 100, losses: [0, 0, -150, 0, -300, 0, -200, 0, -250, -350] }, // Risky, net loss
+    'B': { reward: 100, losses: [0, 0, 0, 0, 0, 0, 0, 0, -1250, 0] },          // Risky, net loss
+    'C': { reward: 50,  losses: [0, 0, -50, 0, -50, 0, 0, -25, -75, 0] },       // Safe, net gain
+    'D': { reward: 50,  losses: [0, 0, 0, 0, 0, 0, 0, 0, -250, 0] }           // Safe, net gain
 };
+const deckPickCounters = { 'A': 0, 'B': 0, 'C': 0, 'D': 0 };
+
+// UI Elements
+const scoreEl = document.getElementById('score');
+const lastOutcomeEl = document.getElementById('last-outcome');
+const roundEl = document.getElementById('round');
+const feedbackAreaEl = document.getElementById('feedback-area');
+const decksContainer = document.getElementById('decks-container');
+const instructionModal = document.getElementById('instruction-modal');
+const finalResultsModal = document.getElementById('final-results-modal');
 
 function logEvent(type, data) {
-    events.push({
+    const event = {
         event_type: type,
-        pick: currentRound,
-        score: score,
-        difficulty: difficulty,
-        timestamp: Date.now(),
+        round: currentRound,
+        score_before: score,
+        timestamp: new Date().toISOString(),
         ...data
-    });
-}
-
-function updateUI() {
-    document.getElementById('round-num').textContent = currentRound;
-    document.getElementById('total-rounds').textContent = TOTAL_ROUNDS;
-    document.getElementById('total-rounds-2').textContent = TOTAL_ROUNDS;
-    document.getElementById('score').textContent = score;
-    document.getElementById('feedback').textContent = '';
-}
-
-document.querySelectorAll('.deck-btn').forEach(btn => {
-    btn.onclick = function() {
-        const deck = btn.getAttribute('data-deck');
-        const deckInfo = decks[deck];
-        let reward = deckInfo.reward;
-        let penalty = 0;
-        let gotPenalty = false;
-        if (Math.random() < deckInfo.penaltyChance) {
-            penalty = deckInfo.penalty;
-            gotPenalty = true;
-        }
-        score += reward - penalty;
-        logEvent('pick', {deck: deck, reward: reward, penalty: penalty, gotPenalty: gotPenalty});
-        document.getElementById('feedback').textContent = `You picked Deck ${deck}: +$${reward}` + (gotPenalty ? `, -$${penalty}` : '');
-        if (currentRound < TOTAL_ROUNDS) {
-            currentRound++;
-            setTimeout(() => {
-                updateUI();
-            }, 1000);
-        } else {
-            document.getElementById('game-area').innerHTML = `<div class='font-bold text-lg'>Game Over! Final score: $${score}</div>`;
-            logEvent('end', {final_score: score});
-            // Mark that we're saving to backend to avoid duplicate saves
-            logEvent('backend_saved', {});
-            sendEventsToBackend();
-            currentRound = TOTAL_ROUNDS + 1; // Mark game as completed
-        }
     };
-});
+    events.push(event);
+}
 
-document.getElementById('back-to-games').onclick = function() {
-    // Disable the button to prevent double clicks
-    document.getElementById('back-to-games').disabled = true;
-    // If game is still active, end session first
-    if (currentRound <= TOTAL_ROUNDS) {
-        logEvent('manual_end', {final_score: score});
-        document.querySelectorAll('.deck-btn').forEach(btn => btn.disabled = true);
-        document.getElementById('game-area').innerHTML = `<div class='font-bold text-lg text-red-600'>Session Ended! Final score: $${score}</div>`;
-        // Save data and then redirect
-        sendEventsToBackend().then(() => {
-            window.location.href = '/games/';
-        }).catch(() => {
-            // Even if save fails, still redirect
-            window.location.href = '/games/';
-        });
-    } else {
-        // Game is completed, ensure data is saved before redirecting
-        // Check if we need to save the completed game data
-        if (events.length > 0 && !events.some(e => e.event_type === 'backend_saved')) {
-            // Mark that we're saving to backend to avoid duplicate saves
-            logEvent('backend_saved', {});
-            sendEventsToBackend().then(() => {
-                window.location.href = '/games/';
-            }).catch(() => {
-                // Even if save fails, still redirect
-                window.location.href = '/games/';
-            });
-        } else {
-            // Data already saved or no data to save, safe to redirect
-            window.location.href = '/games/';
-        }
-    }
-};
+function updateDashboard() {
+    scoreEl.textContent = `$${score}`;
+    roundEl.textContent = `${currentRound > TOTAL_ROUNDS ? TOTAL_ROUNDS : currentRound}/${TOTAL_ROUNDS}`;
+}
 
-function sendEventsToBackend() {
-    return fetch('/games/save_game_result/', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': getCookie('csrftoken')
-        },
-        body: JSON.stringify({
-            game_type: 'cards_game',
-            score: score,
-            duration: TOTAL_ROUNDS * 10,
-            decisions: events.filter(e => e.event_type === 'pick'),
-            reaction_times: [],
-            raw_data: {events: events}
-        })
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.success) {
-            console.log('Session saved successfully');
-        } else {
-            console.error('Error saving session: ' + data.error);
-        }
-        return data;
+function handleDeckPick(e) {
+    if (decksLocked || !e.target.classList.contains('deck')) return;
+    decksLocked = true;
+
+    const deckId = e.target.dataset.deck;
+    const schedule = deckSchedules[deckId];
+    const pickCount = deckPickCounters[deckId];
+    
+    const gain = schedule.reward;
+    const loss = schedule.losses[pickCount % schedule.losses.length];
+    const netChange = gain + loss;
+    const reactionTime = Date.now() - pickStartTime;
+
+    score += netChange;
+    deckPickCounters[deckId]++;
+
+    logEvent('pick', {
+        deck: deckId,
+        gain: gain,
+        loss: Math.abs(loss),
+        net_change: netChange,
+        score_after: score,
+        reaction_time_ms: reactionTime
     });
+
+    showFeedback(gain, loss);
+    updateDashboard();
+    
+    if (currentRound >= TOTAL_ROUNDS) {
+        setTimeout(endGame, 2000);
+    } else {
+        currentRound++;
+        setTimeout(() => {
+            decksLocked = false;
+            pickStartTime = Date.now();
+        }, 1000);
+    }
+}
+
+function showFeedback(gain, loss) {
+    feedbackAreaEl.innerHTML = ''; // Clear previous
+    const gainEl = document.createElement('div');
+    gainEl.textContent = `+ $${gain}`;
+    gainEl.className = 'gain feedback-anim';
+    
+    lastOutcomeEl.textContent = `${gain + loss >= 0 ? '+' : ''}$${gain + loss}`;
+    lastOutcomeEl.className = `metric-value ${gain + loss >= 0 ? 'gain' : 'loss'}`;
+
+    feedbackAreaEl.appendChild(gainEl);
+
+    if (loss < 0) {
+        setTimeout(() => {
+            const lossEl = document.createElement('div');
+            lossEl.textContent = `- $${Math.abs(loss)}`;
+            lossEl.className = 'loss feedback-anim';
+            lossEl.style.marginLeft = '1rem';
+            feedbackAreaEl.appendChild(lossEl);
+        }, 500);
+    }
+}
+
+function endGame() {
+    gameCompleted = true;
+    decksLocked = true;
+    logEvent('game_end', { final_score: score });
+
+    document.getElementById('final-score').textContent = `Your final net worth: $${score}`;
+    const summary = score > STARTING_SCORE 
+        ? `You made a profit of $${score - STARTING_SCORE}. Well done!`
+        : `You ended with a loss of $${STARTING_SCORE - score}.`;
+    document.getElementById('final-summary').textContent = summary;
+    finalResultsModal.style.display = 'flex';
+    sendEventsToBackend();
+}
+
+function startGame() {
+    instructionModal.style.display = 'none';
+    logEvent('game_start', {});
+    decksLocked = false;
+    pickStartTime = Date.now();
+    updateDashboard();
 }
 
 function getCookie(name) {
@@ -159,6 +288,46 @@ function getCookie(name) {
     return cookieValue;
 }
 
-updateUI();
+function sendEventsToBackend() {
+    const completionStatus = gameCompleted ? 'completed' : 'abandoned';
+    const totalDuration = events.length > 1 ? new Date(events[events.length - 1].timestamp) - new Date(events[0].timestamp) : 0;
+
+    return fetch('/games/save-result/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({
+            game_type: 'cards_game',
+            score: score,
+            duration: totalDuration,
+            raw_data: { events: events },
+            completion_status: completionStatus
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (!data.success) console.error('Error saving session: ' + data.error);
+        return data;
+    });
+}
+
+// Event Listeners
+document.getElementById('start-game-btn').addEventListener('click', startGame);
+decksContainer.addEventListener('click', handleDeckPick);
+
+document.getElementById('back-to-games').addEventListener('click', function() {
+    this.disabled = true;
+    if (!gameCompleted) {
+        logEvent('game_abandoned', { final_score: score });
+        sendEventsToBackend().finally(() => {
+            window.location.href = '/games/';
+        });
+    } else {
+        // Game is over, data is already being sent, just redirect
+        window.location.href = '/games/';
+    }
+});
 </script>
 {% endblock %}

@@ -1,240 +1,368 @@
 {% extends 'base.html' %}
-
-{% block title %}Sorting Task Game - Rasmetric{% endblock %}
-
+{% load static %}
 {% block content %}
-<div class="min-h-screen bg-gray-50">
-  <div class="max-w-4xl mx-auto px-4 py-8">
-    <button
-      onclick="window.location.href='{% url 'game_list' %}'"
-      class="flex items-center text-gray-600 hover:text-gray-900 mb-6"
-    >
-      <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-      </svg>
-      Back to Games
-    </button>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+<style>
+    :root {
+        --primary-color: #A78BFA; /* Violet-400 */
+        --correct-color: #34D399;   /* Green-400 */
+        --incorrect-color: #F87171; /* Red-400 */
+        --background-color: #0F172A; /* Slate-900 */
+        --surface-color: #1E293B;   /* Slate-800 */
+        --text-color: #F1F5F9;       /* Slate-100 */
+        --muted-text-color: #94A3B8; /* Slate-400 */
+        --border-color: #334155;     /* Slate-700 */
+    }
+    .game-body { background-color: var(--background-color); color: var(--text-color); font-family: 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 1rem; }
+    .game-container { background-color: var(--surface-color); border-radius: 12px; border: 1px solid var(--border-color); box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3); width: 100%; max-width: 800px; overflow: hidden; }
+    .game-header { background-color: rgba(0,0,0,0.2); padding: 1.5rem; text-align: center; border-bottom: 1px solid var(--border-color); }
+    .game-header h2 { font-size: 1.75rem; font-weight: bold; margin: 0; }
+    .dashboard { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 1rem; padding: 1.5rem; border-bottom: 1px solid var(--border-color); }
+    .stat-card { background-color: rgba(0,0,0,0.2); padding: 1rem; border-radius: 8px; text-align: center; }
+    .stat-card .value { font-size: 1.5rem; font-weight: bold; color: var(--primary-color); }
+    .stat-card .label { font-size: 0.8rem; color: var(--muted-text-color); text-transform: uppercase; font-weight: 600; }
+    .game-area { padding: 2rem; min-height: 350px; display: flex; flex-direction: column; justify-content: center; align-items: center; position: relative; }
+    #stimulus-area { width: 100%; height: 200px; display: flex; justify-content: center; align-items: center; font-size: 7rem; font-weight: bold; }
+    #timer-bar { position: absolute; bottom: 0; left: 0; height: 8px; width: 100%; background-color: var(--primary-color); transition: width 0.1s linear; }
+    .feedback-area { text-align: center; margin-top: 1.5rem; font-size: 1.1rem; color: var(--muted-text-color); min-height: 24px; }
+    .categories-display { display: flex; justify-content: space-around; width: 100%; padding: 1rem; background-color: rgba(0,0,0,0.2); border-top: 1px solid var(--border-color); }
+    .category { font-weight: bold; font-size: 1.1rem; } .category span { background-color: var(--primary-color); color: var(--background-color); padding: 0.2rem 0.5rem; border-radius: 4px; margin-right: 0.5rem; }
+    .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); justify-content: center; align-items: center; }
+    .modal-content { background-color: var(--surface-color); padding: 2.5rem; border-radius: 12px; border: 1px solid var(--border-color); max-width: 500px; width: 90%; box-shadow: 0 5px 15px rgba(0,0,0,0.5); animation: modal-pop 0.3s ease-out; text-align: center; }
+    @keyframes modal-pop { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    .btn { padding: 0.75rem 2rem; border: none; border-radius: 8px; font-size: 1rem; font-weight: bold; cursor: pointer; transition: all 0.2s; color: var(--background-color); background-color: var(--primary-color); }
+    .btn:hover { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(167, 139, 250, 0.3); }
+    #back-to-games-btn { position: absolute; top: 20px; left: 20px; background-color: rgba(0, 0, 0, 0.3); color: var(--text-color); padding: 0.5rem 1rem; border-radius: 8px; text-decoration: none; font-weight: bold; z-index: 10; }
+</style>
 
-    <div id="gameContainer" class="text-center">
-      <h2 class="text-2xl font-bold text-gray-900 mb-4">Sorting Task</h2>
-      <div class="bg-white rounded-lg shadow-sm p-8 mb-6">
-        <div class="flex justify-between items-center mb-6">
-          <div>
-            <p class="text-sm text-gray-600">Score: <span id="scoreDisplay">0</span></p>
-            <p class="text-sm text-gray-600">Missed: <span id="missedDisplay">0</span>/10</p>
-          </div>
-          <div class="text-right">
-            <p class="text-sm text-gray-600">Speed: <span id="speedDisplay">1.0</span>x</p>
-          </div>
-        </div>
+<div class="game-body" data-game-list-url="{% url 'games:game_list' %}" data-csrf-token="{{ csrf_token }}">
+    <a href="#" id="back-to-games-btn"><i class="fas fa-arrow-left"></i> Back to Games</a>
 
-        <div class="relative bg-gray-100 rounded-lg overflow-hidden" style="height: 400px;" id="gameArea">
-          <!-- Falling objects will be rendered here -->
+    <div class="game-container">
+        <div class="game-header"><h2>Cognitive Sorting Challenge</h2></div>
+        <div class="dashboard">
+            <div class="stat-card"><div id="trial-count" class="value">-</div><div class="label">Trial</div></div>
+            <div class="stat-card"><div id="score" class="value">0</div><div class="label">Score</div></div>
+            <div class="stat-card"><div id="accuracy" class="value">-</div><div class="label">Accuracy</div></div>
+            <div class="stat-card"><div id="avg-rt" class="value">-</div><div class="label">Avg. RT (ms)</div></div>
         </div>
-
-        <div class="flex justify-center space-x-4 mt-6">
-          <button
-            onclick="handleBinClick('fruit')"
-            class="bg-green-600 text-white px-6 py-3 rounded-md hover:bg-green-700 flex items-center"
-          >
-            🍎 Fruit
-          </button>
-          <button
-            onclick="handleBinClick('animal')"
-            class="bg-blue-600 text-white px-6 py-3 rounded-md hover:bg-blue-700 flex items-center"
-          >
-            🐶 Animal
-          </button>
-          <button
-            onclick="handleBinClick('vehicle')"
-            class="bg-purple-600 text-white px-6 py-3 rounded-md hover:bg-purple-700 flex items-center"
-          >
-            🚗 Vehicle
-          </button>
+        <div class="game-area">
+            <div id="stimulus-area"></div>
+            <div id="feedback-area" class="feedback-area"></div>
+            <div id="timer-bar"></div>
         </div>
-      </div>
+        <div class="categories-display">
+            <div class="category"><span>F</span>Fruit 🍎</div>
+            <div class="category"><span>A</span>Animal 🐶</div>
+            <div class="category"><span>V</span>Vehicle 🚗</div>
+        </div>
     </div>
 
-    <div id="gameOverContainer" class="text-center hidden">
-      <h2 class="text-2xl font-bold text-gray-900 mb-4">Game Complete!</h2>
-      <div class="bg-blue-50 rounded-lg p-6 mb-6">
-        <p class="text-lg text-gray-700 mb-2">Final Score: <span id="finalScore" class="font-bold text-blue-600">0</span></p>
-        <p class="text-lg text-gray-700 mb-2">Objects Missed: <span id="finalMissed" class="font-bold text-red-600">0</span></p>
-        <p class="text-sm text-gray-600">Accuracy: <span id="finalAccuracy">0</span>%</p>
-      </div>
-      <button
-        onclick="window.location.href='{% url 'game_list' %}'"
-        class="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700"
-      >
-        Continue
-      </button>
+    <!-- Modals -->
+    <div id="instruction-modal" class="modal" style="display: flex;">
+        <div class="modal-content">
+            <h3 style="font-size: 1.5rem; font-weight: bold; color: var(--primary-color);">Cognitive Sorting Challenge</h3>
+            <p style="margin: 1rem 0; color: var(--muted-text-color);">An object will appear on the screen. Categorize it as quickly as you can.</p>
+            <ul style="text-align: left; margin: 1rem auto; max-width: 90%; color: var(--muted-text-color);">
+                <li>Press <strong>F</strong> to classify as a <strong>Fruit</strong>.</li>
+                <li>Press <strong>A</strong> to classify as an <strong>Animal</strong>.</li>
+                <li>Press <strong>V</strong> to classify as a <strong>Vehicle</strong>.</li>
+            </ul>
+            <p style="font-weight: bold;">The time you have to respond will decrease as you get more answers correct. Good luck!</p>
+            <button id="start-game-btn" class="btn" style="margin-top: 1.5rem;">Begin</button>
+        </div>
     </div>
-  </div>
+
+    <div id="final-results-modal" class="modal">
+        <div class="modal-content">
+            <h3 style="font-size: 1.5rem; font-weight: bold; color: var(--primary-color);">Challenge Complete!</h3>
+            <div id="final-summary" style="margin: 1.5rem 0; font-size: 1.1rem; display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;"></div>
+            <button id="return-to-games-final-btn" class="btn">Return to Games</button>
+        </div>
+    </div>
 </div>
 
 <script>
-const objectTypes = {
-  fruit: ['🍎', '🍌', '🍇', '🍊', '🍓'],
-  animal: ['🐶', '🐱', '🐸', '🐰', '🐨'],
-  vehicle: ['🚗', '🚲', '✈️', '🚢', '🚂']
-};
-let objects = [];
-let score = 0;
-let missed = 0;
-let gameOver = false;
-let speed = 1.0;
-let startTime = Date.now();
-let decisions = [];
-let reactionTimes = [];
-let clickStartTime = 0;
-let gameLoopInterval = null;
+document.addEventListener('DOMContentLoaded', () => {
+    // --- CONFIGURATION ---
+    const config = {
+        TOTAL_TRIALS: 60,
+        INITIAL_TIME_LIMIT: 3000, // ms
+        TIME_DECREMENT: 50,       // ms reduction on correct answer
+        MIN_TIME_LIMIT: 500,        // ms
+        SCORE_CORRECT: 100,
+        SCORE_INCORRECT: -50,
+        STIMULI: {
+            fruit: ['🍎', '🍌', '🍇', '🍊', '🍓', '🥝', '🍍'],
+            animal: ['🐶', '🐱', '🐸', '🐰', '🐨', '🦊', '🐻'],
+            vehicle: ['🚗', '🚲', '✈️', '🚢', '🚂', '🚁', '🚚']
+        },
+        KEY_MAP: {
+            'f': 'fruit',
+            'a': 'animal',
+            'v': 'vehicle'
+        }
+    };
 
-function spawnObject() {
-  const types = Object.keys(objectTypes);
-  const type = types[Math.floor(Math.random() * types.length)];
-  const icons = objectTypes[type];
-  const icon = icons[Math.floor(Math.random() * icons.length)];
-  const newObj = {
-    id: Date.now() + Math.random(),
-    type: type,
-    icon: icon,
-    x: Math.random() * 400 + 50,
-    y: -50,
-    speed: Math.random() * 2 + 3
-  };
-  objects.push(newObj);
-}
+    // --- DOM ELEMENTS ---
+    const elements = {
+        body: document.querySelector('.game-body'),
+        instructionModal: document.getElementById('instruction-modal'),
+        finalResultsModal: document.getElementById('final-results-modal'),
+        startGameBtn: document.getElementById('start-game-btn'),
+        backToGamesBtn: document.getElementById('back-to-games-btn'),
+        returnToGamesFinalBtn: document.getElementById('return-to-games-final-btn'),
+        trialCount: document.getElementById('trial-count'),
+        score: document.getElementById('score'),
+        accuracy: document.getElementById('accuracy'),
+        avgRt: document.getElementById('avg-rt'),
+        stimulusArea: document.getElementById('stimulus-area'),
+        feedbackArea: document.getElementById('feedback-area'),
+        timerBar: document.getElementById('timer-bar'),
+        finalSummary: document.getElementById('final-summary')
+    };
 
-function renderObjects() {
-  const gameArea = document.getElementById('gameArea');
-  gameArea.innerHTML = '';
-  objects.forEach(obj => {
-    const el = document.createElement('div');
-    el.className = 'absolute text-2xl cursor-pointer transition-all duration-100 hover:scale-110';
-    el.style.left = obj.x + 'px';
-    el.style.top = obj.y + 'px';
-    el.textContent = obj.icon;
-    el.onclick = () => handleObjectClick(obj.id);
-    gameArea.appendChild(el);
-  });
-}
+    // --- GAME STATE ---
+    let state = {};
 
-function updateDisplay() {
-  document.getElementById('scoreDisplay').textContent = score;
-  document.getElementById('missedDisplay').textContent = missed;
-  document.getElementById('speedDisplay').textContent = speed.toFixed(1);
-}
-
-function handleObjectClick(objectId) {
-  clickStartTime = Date.now();
-}
-
-function handleBinClick(binType) {
-  if (objects.length === 0) return;
-  const objectId = objects[0].id;
-  const reactionTime = Date.now() - clickStartTime;
-  reactionTimes.push(reactionTime);
-  const object = objects.find(obj => obj.id === objectId);
-  if (object && object.type === binType) {
-    score += 10;
-    decisions.push({
-      objectId: objectId,
-      objectType: object.type,
-      binType: binType,
-      correct: true,
-      reactionTime: reactionTime
-    });
-  } else {
-    score = Math.max(0, score - 5);
-    decisions.push({
-      objectId: objectId,
-      objectType: object ? object.type : null,
-      binType: binType,
-      correct: false,
-      reactionTime: reactionTime
-    });
-  }
-  objects = objects.filter(obj => obj.id !== objectId);
-  updateDisplay();
-  renderObjects();
-}
-
-function gameLoop() {
-  if (Math.random() < 0.3) {
-    spawnObject();
-  }
-  objects.forEach(obj => {
-    obj.y += obj.speed * speed;
-  });
-  // Remove objects that fell off screen
-  const remaining = objects.filter(obj => obj.y < 600);
-  const fell = objects.filter(obj => obj.y >= 600);
-  if (fell.length > 0) {
-    missed += fell.length;
-    updateDisplay();
-  }
-  objects = remaining;
-  speed += 0.001;
-  updateDisplay();
-  renderObjects();
-  if (missed >= 10) {
-    endGame();
-  }
-}
-
-function endGame() {
-  gameOver = true;
-  clearInterval(gameLoopInterval);
-  const totalTime = Date.now() - startTime;
-  const accuracy = decisions.length > 0 ? decisions.filter(d => d.correct).length / decisions.length : 0;
-  document.getElementById('gameContainer').classList.add('hidden');
-  document.getElementById('gameOverContainer').classList.remove('hidden');
-  document.getElementById('finalScore').textContent = Math.min(score, 100);
-  document.getElementById('finalMissed').textContent = missed;
-  document.getElementById('finalAccuracy').textContent = Math.round(accuracy * 100);
-  saveGameResult(totalTime, accuracy);
-}
-
-function saveGameResult(totalTime, accuracy) {
-  const gameData = {
-    game_type: 'sorting_task',
-    score: Math.min(score, 100),
-    duration: totalTime,
-    decisions: decisions,
-    reaction_times: reactionTimes,
-    raw_data: {
-      finalScore: score,
-      objectsMissed: missed,
-      accuracy: accuracy,
-      finalSpeed: speed,
-      averageReactionTime: reactionTimes.reduce((a, b) => a + b, 0) / (reactionTimes.length || 1)
+    function resetState() {
+        state = {
+            gameActive: false,
+            gameFinished: false,
+            currentTrial: 0,
+            score: 0,
+            timeLimit: config.INITIAL_TIME_LIMIT,
+            trialStartTime: 0,
+            responseTimeout: null,
+            trialList: [],
+            eventLog: []
+        };
     }
-  };
-  fetch('{% url "games:save_game_result" %}', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-    },
-    body: JSON.stringify(gameData)
-  })
-  .then(response => response.json())
-  .then(data => {
-    console.log('Game result saved:', data);
-  })
-  .catch(error => {
-    console.error('Error saving game result:', error);
-  });
-}
 
-document.addEventListener('DOMContentLoaded', function() {
-  updateDisplay();
-  renderObjects();
-  gameLoopInterval = setInterval(() => {
-    if (!gameOver) gameLoop();
-  }, 50);
+    // --- CORE GAME LOGIC ---
+    function init() {
+        resetState();
+        createTrialList();
+        updateDashboard();
+        elements.instructionModal.style.display = 'flex';
+        elements.finalResultsModal.style.display = 'none';
+
+        // Event Listeners
+        elements.startGameBtn.onclick = startGame;
+        elements.backToGamesBtn.onclick = () => quitGame('abandoned');
+        elements.returnToGamesFinalBtn.onclick = () => quitGame('completed');
+        document.addEventListener('keydown', handleKeyPress);
+    }
+
+    function createTrialList() {
+        state.trialList = [];
+        for (const category in config.STIMULI) {
+            config.STIMULI[category].forEach(icon => {
+                state.trialList.push({ icon, category });
+            });
+        }
+        // Create a balanced list of 60 trials
+        let fullList = [];
+        while (fullList.length < config.TOTAL_TRIALS) {
+            fullList.push(...shuffleArray([...state.trialList]));
+        }
+        state.trialList = fullList.slice(0, config.TOTAL_TRIALS);
+    }
+
+    function startGame() {
+        elements.instructionModal.style.display = 'none';
+        state.gameActive = true;
+        runTrial();
+    }
+
+    function runTrial() {
+        if (state.currentTrial >= config.TOTAL_TRIALS) {
+            endGame('completed');
+            return;
+        }
+
+        clearTrialState();
+        const trial = state.trialList[state.currentTrial];
+        elements.stimulusArea.textContent = trial.icon;
+        elements.stimulusArea.style.color = 'var(--text-color)';
+        updateDashboard();
+
+        state.trialStartTime = performance.now();
+        startTimerAnimation();
+
+        state.responseTimeout = setTimeout(() => {
+            handleResponse(null, null); // Timeout = no response
+        }, state.timeLimit);
+    }
+
+    function handleKeyPress(e) {
+        if (!state.gameActive || !config.KEY_MAP[e.key.toLowerCase()]) return;
+        const userCategory = config.KEY_MAP[e.key.toLowerCase()];
+        const rt = performance.now() - state.trialStartTime;
+        handleResponse(userCategory, rt);
+    }
+
+    function handleResponse(userCategory, rt) {
+        if (!state.gameActive) return; // Prevent multiple responses for one trial
+        state.gameActive = false; // Temporarily disable input
+        clearTimeout(state.responseTimeout);
+
+        const trial = state.trialList[state.currentTrial];
+        const correct = userCategory === trial.category;
+        let outcome;
+
+        if (userCategory === null) { // Timeout
+            outcome = 'miss';
+            state.score += config.SCORE_INCORRECT;
+            elements.feedbackArea.textContent = 'Too slow!';
+            elements.stimulusArea.style.color = 'var(--incorrect-color)';
+        } else if (correct) {
+            outcome = 'correct';
+            state.score += config.SCORE_CORRECT;
+            elements.feedbackArea.textContent = 'Correct!';
+            elements.stimulusArea.style.color = 'var(--correct-color)';
+            // Decrease time limit for next trial
+            state.timeLimit = Math.max(config.MIN_TIME_LIMIT, state.timeLimit - config.TIME_DECREMENT);
+        } else { // Incorrect
+            outcome = 'incorrect';
+            state.score += config.SCORE_INCORRECT;
+            elements.feedbackArea.textContent = `Incorrect!`;
+            elements.stimulusArea.style.color = 'var(--incorrect-color)';
+        }
+
+        logEvent(trial, userCategory, rt, correct, outcome);
+        state.currentTrial++;
+        updateDashboard();
+
+        setTimeout(() => {
+            state.gameActive = true;
+            runTrial();
+        }, 800); // Inter-trial interval
+    }
+
+    function endGame(completionStatus) {
+        if (state.gameFinished) return;
+        state.gameFinished = true;
+        state.gameActive = false;
+        clearTimeout(state.responseTimeout);
+
+        displayFinalResults();
+        saveGameResult(completionStatus);
+    }
+
+    async function quitGame(completionStatus) {
+        if (!state.gameFinished) {
+            state.gameFinished = true;
+            state.gameActive = false;
+            clearTimeout(state.responseTimeout);
+            await saveGameResult(completionStatus);
+        }
+        window.location.href = elements.body.dataset.gameListUrl;
+    }
+
+    // --- UI & DISPLAY ---
+    function updateDashboard() {
+        const correctTrials = state.eventLog.filter(e => e.correct);
+        const respondedTrials = state.eventLog.filter(e => e.rt !== null);
+        const accuracy = respondedTrials.length > 0 ? (correctTrials.length / respondedTrials.length) * 100 : 0;
+        const avgRt = respondedTrials.length > 0 ? respondedTrials.reduce((acc, e) => acc + e.rt, 0) / respondedTrials.length : 0;
+
+        elements.trialCount.textContent = `${state.currentTrial}/${config.TOTAL_TRIALS}`;
+        elements.score.textContent = state.score;
+        elements.accuracy.textContent = `${accuracy.toFixed(1)}%`;
+        elements.avgRt.textContent = avgRt.toFixed(0);
+    }
+
+    function displayFinalResults() {
+        const correctTrials = state.eventLog.filter(e => e.correct).length;
+        const incorrectTrials = state.eventLog.filter(e => e.outcome === 'incorrect').length;
+        const missedTrials = state.eventLog.filter(e => e.outcome === 'miss').length;
+        const accuracy = state.eventLog.length > 0 ? (correctTrials / state.eventLog.length) * 100 : 0;
+        const avgRt = state.eventLog.length > 0 ? state.eventLog.reduce((acc, e) => acc + (e.rt || 0), 0) / state.eventLog.filter(e => e.rt).length : 0;
+
+        elements.finalSummary.innerHTML = `
+            <div><strong>Final Score:</strong> <span style="color: var(--primary-color)">${state.score}</span></div>
+            <div><strong>Accuracy:</strong> <span style="color: var(--primary-color)">${accuracy.toFixed(1)}%</span></div>
+            <div><strong>Avg. Reaction Time:</strong> <span style="color: var(--primary-color)">${avgRt.toFixed(0)} ms</span></div>
+            <div><strong>Correct:</strong> <span style="color: var(--correct-color)">${correctTrials}</span></div>
+            <div><strong>Incorrect:</strong> <span style="color: var(--incorrect-color)">${incorrectTrials}</span></div>
+            <div><strong>Missed:</strong> <span style="color: var(--muted-text-color)">${missedTrials}</span></div>
+        `;
+        elements.finalResultsModal.style.display = 'flex';
+    }
+
+    function startTimerAnimation() {
+        elements.timerBar.style.transition = 'none';
+        elements.timerBar.style.width = '100%';
+        // Force reflow
+        elements.timerBar.offsetHeight;
+        elements.timerBar.style.transition = `width ${state.timeLimit / 1000}s linear`;
+        elements.timerBar.style.width = '0%';
+    }
+
+    function clearTrialState() {
+        elements.feedbackArea.textContent = '';
+        elements.stimulusArea.textContent = '';
+        elements.timerBar.style.transition = 'none';
+        elements.timerBar.style.width = '100%';
+    }
+
+    // --- DATA & UTILS ---
+    function logEvent(trial, userCategory, rt, correct, outcome) {
+        state.eventLog.push({
+            trial: state.currentTrial + 1,
+            stimulus_icon: trial.icon,
+            stimulus_category: trial.category,
+            response_category: userCategory,
+            rt: rt,
+            correct: correct,
+            outcome: outcome,
+            time_limit: state.timeLimit
+        });
+    }
+
+    async function saveGameResult(completionStatus) {
+        const csrfToken = elements.body.dataset.csrfToken;
+        const url = "{% url 'games:save_game_result' %}";
+        const finalAccuracy = state.eventLog.length > 0 ? (state.eventLog.filter(e => e.correct).length / state.eventLog.length) : 0;
+
+        const payload = {
+            game_name: 'cognitive_sorting_challenge',
+            score: state.score,
+            completion_status: completionStatus,
+            raw_data: {
+                events: state.eventLog,
+                final_accuracy: finalAccuracy,
+                total_trials: state.currentTrial
+            }
+        };
+
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify(payload)
+            });
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            return await response.json();
+        } catch (error) {
+            console.error('Error saving game result:', error);
+        }
+    }
+
+    function shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
+    }
+
+    // --- INITIALIZE ---
+    init();
 });
 </script>
-
-{% csrf_token %}
-{% endblock %} 
+{% endblock %}

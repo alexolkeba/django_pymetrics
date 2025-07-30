@@ -10,29 +10,30 @@ from .models import GameSession, GameResult
 def game_list(request):
     """Display the list of available games"""
     GAME_TYPES = [
-        ('balloon_risk', 'Balloon Risk Game', 'Test your risk tolerance by inflating balloons', 'Risk Tolerance', '🎈', 'Inflate balloons to earn points, but be careful not to pop them! Each pump increases your score, but also the risk of popping. Find the right balance between risk and reward.'),
+        ('balloon_risk', 'Adaptive Risk Challenge', 'Test your risk-taking behavior with an adaptive challenge.', 'Risk-Taking', '🎈', 'Pump the balloon to earn money. The more you pump, the more you can earn, but the risk of it bursting also increases. The game adapts to your playstyle. Cash out before it pops!'),
         ('money_exchange_1', 'Money Exchange Game #1', 'Test economic decision-making and trust', 'Economic Decision-Making', '💰', 'You have $10 each round. Decide how much to send to your partner. They will return a portion based on trust. Your goal is to maximize total earnings over multiple rounds.'),
         ('money_exchange_2', 'Money Exchange Game #2', 'Test economic decision-making and trust (variant)', 'Economic Decision-Making', '💵', 'Similar to Game #1, but with different partner behavior patterns. Learn to adapt your strategy based on your partner\'s trustworthiness across rounds.'),
         ('easy_or_hard', 'Easy or Hard Game', 'Choose between easy and hard tasks', 'Effort Allocation', '🎲', 'You\'ll see pairs of options: easy tasks with lower rewards and hard tasks with higher rewards. Choose based on your effort preferences and risk tolerance.'),
         ('cards_game', 'Cards Game (Iowa Gambling)', 'Test risk and reward learning', 'Risk/Reward Learning', '🃏', 'Choose cards from 4 different decks. Some decks have higher immediate rewards but long-term losses, others have lower rewards but better long-term outcomes. Learn which decks are most profitable.'),
-        ('arrows_game', 'Arrows Game', 'Test spatial attention', 'Spatial Attention', '➡️', 'Arrows will appear pointing in different directions. Click the corresponding arrow key (left, right, up, down) as quickly and accurately as possible.'),
+        ('arrows_game', 'Arrows Game', 'Test spatial attention', 'Spatial Attention', '➡️', 'Arrows will appear in different directions. Click the corresponding arrow key (left, right, up, down) as quickly and accurately as possible.'),
         ('lengths_game', 'Lengths Game', 'Test visual estimation', 'Visual Estimation', '📏', 'You\'ll see two lines of different lengths. Click on the longer line. The differences may be subtle, so pay close attention to visual details.'),
+        ('memory_cards', 'Spatial Working Memory Challenge', 'Test your spatial memory with an adaptive challenge.', 'Memory', '🧠', 'Find all matching pairs. The grid size adapts to your performance, testing the limits of your working memory.'),
         ('keypresses', 'Keypresses Game', 'Test motor speed and accuracy', 'Motor Speed', '⌨️', 'Press the spacebar as quickly as possible when prompted. Your reaction time and consistency will be measured.'),
         ('faces_game', 'Faces Game', 'Test facial recognition', 'Facial Recognition', '🙂', 'You\'ll see a target face, then multiple faces. Click on the face that matches the target. Pay attention to facial features and expressions.'),
         ('letters', 'Letters Game', 'Identify and submit letters', 'Verbal Reasoning', '🔤', 'A letter will appear on screen. Type that exact letter as quickly and accurately as possible. Both speed and accuracy matter.'),
-        ('magnitudes', 'Magnitudes Game', 'Estimate and submit magnitudes', 'Quantitative Reasoning', '📏', 'You\'ll be shown numerical values or quantities. Estimate and enter the correct magnitude. This tests your numerical reasoning and estimation skills.'),
-        ('sequences', 'Sequences Game', 'Complete and submit sequences', 'Sequential Reasoning', '🔗', 'You\'ll see a sequence of numbers, letters, or patterns with one missing element. Identify the pattern and enter the missing item to complete the sequence.'),
-        ('memory_cards', 'Memory Cards Game', 'Find matching pairs of cards', 'Working Memory', '🃏', 'Cards are placed face down. Click two cards to reveal them. If they match, they stay face up. Find all matching pairs to complete the game.'),
-        ('reaction_timer', 'Reaction Timer Game', 'Test your reaction speed', 'Reaction Speed', '⚡', 'Wait for the screen to turn green, then click as quickly as possible. Don\'t click before it turns green, as this will count as an error.'),
-        ('sorting_task', 'Sorting Task Game', 'Sort objects into categories quickly', 'Cognitive Flexibility', '📦', 'Objects will fall from the top. Sort them into the correct categories by clicking the appropriate bins. Categories may change during the game.'),
-        ('pattern_completion', 'Pattern Completion Game', 'Complete number patterns', 'Pattern Recognition', '🔢', 'You\'ll see a sequence of numbers with one missing. Identify the mathematical pattern (addition, subtraction, multiplication, etc.) and choose the correct next number.'),
-        ('stroop_test', 'Stroop Test Game', 'Test cognitive control and attention', 'Cognitive Control', '🎨', 'Words will appear in different colors. Click the color of the text, NOT what the word says. For example, if you see "RED" written in blue, click the blue button.'),
+        ('magnitudes', 'Numerical Acuity Challenge', 'Test your ability to distinguish between numerical quantities.', 'Quantitative Reasoning', '🔢', 'Choose the larger of two numbers. The difference between them will adapt based on your performance, measuring the precision of your number sense.'),
+
+
+        ('reaction_timer', 'Temporal Reflex Challenge', 'Test your reaction speed with precision timing.', 'Reaction Speed', '⚡', 'Wait for the visual cue to change, then respond as quickly as possible. This challenge measures your raw reaction time and consistency under pressure.'),
+        ('sorting_task', 'Cognitive Sorting Challenge', 'Sort objects by changing rules.', 'Cognitive Flexibility', '📦', 'Sort items based on a specific rule (e.g., color or shape). The rule will change unexpectedly, testing your ability to adapt and switch your cognitive set.'),
+        ('pattern_completion', 'Inductive Reasoning Challenge', 'Test your ability to find complex patterns', 'Logical Reasoning', '🧠', 'Identify the underlying rule in a sequence of numbers and find the missing element. The patterns will become more complex as you progress.'),
+        ('stroop_test', 'Cognitive Control Challenge', 'Test your attention and response inhibition with adaptive difficulty.', 'Cognitive Control', '🎨', 'Identify the FONT COLOR of the word, not the word itself. The time you have to respond will change based on your performance, so stay focused!'),
         ('tower_of_hanoi', 'Tower of Hanoi Game', 'Solve the classic puzzle', 'Planning & Problem Solving', '🗼', 'Move all disks from the left tower to the right tower. You can only move one disk at a time, and you cannot place a larger disk on top of a smaller one. Plan your moves carefully.'),
-        ('emotional_faces', 'Emotional Faces Game', 'Identify facial expressions', 'Emotional Intelligence', '😊', 'You\'ll see faces showing different emotions. Choose the emotion that best matches the facial expression from the options provided.'),
-        ('trust_game', 'Trust Game', 'Test trust and cooperation', 'Trust & Cooperation', '🤝', 'You\'ll be paired with different partners. Decide how much money to invest with each partner. Some partners are more trustworthy than others. Learn to identify and work with trustworthy partners.'),
-        ('stop_signal', 'Stop Signal Game', 'Test impulse control', 'Impulse Control', '🛑', 'Press arrow keys to respond to directional cues. However, if you see a stop signal, you must stop pressing keys immediately. This tests your ability to control impulsive responses.'),
-        ('digit_span', 'Digit Span Game', 'Test working memory capacity', 'Working Memory', '🔢', 'A sequence of numbers will be shown briefly. Remember the numbers and enter them in the correct order. Sequences get longer as you progress.'),
-        ('fairness_game', 'Fairness Game', 'Test fairness perception', 'Fairness Perception', '⚖️', 'You\'ll see two people who have completed a task. Distribute money between them fairly based on their performance. Consider effort, outcome, and fairness principles.'),
+        ('emotional_faces', 'Facial Emotion Perception', 'Test your ability to perceive emotions in faces.', 'Emotional Intelligence', '😊', 'Identify the correct emotion from a series of facial expressions. This task measures your accuracy and speed in recognizing social cues.'),
+
+        ('stop_signal', 'Inhibitory Control Challenge', 'Test your ability to stop a response.', 'Impulse Control', '🛑', 'Respond to a primary task, but inhibit your response when a stop signal appears. This measures your ability to control impulsive actions.'),
+        ('digit_span', 'Working Memory Challenge', 'Test your forward and backward digit span.', 'Working Memory', '🧠', 'Recall an ever-increasing sequence of numbers in both forward and backward order. This task measures the capacity of your working memory.'),
+        ('fairness_game', 'Economic Fairness Challenge', 'Test your sense of fairness in economic exchanges.', 'Social Decision-Making', '⚖️', 'Engage in 15 rounds of the Ultimatum Game with an AI partner. Decide how to split $10, but be aware: if your partner rejects your offer, no one gets anything. Your partner\'s behavior will change, testing your adaptability.'),
         ('attention_network', 'Attention Network Game', 'Test your attention and focus', 'Attention Network', '🧠', 'You\'ll see cues and targets on screen. Respond to targets as quickly and accurately as possible. The cues may help or distract you - focus on the targets.'),
     ]
 
@@ -40,6 +41,7 @@ def game_list(request):
     for gt in GAME_TYPES:
         game_type, name, description, trait, icon, instructions = gt
         result_qs = GameResult.objects.filter(user=request.user, game_type=game_type)
+        completed_result_qs = result_qs.filter(completion_status='completed')
         games.append({
             'type': game_type,
             'name': name,
@@ -47,8 +49,8 @@ def game_list(request):
             'trait': trait,
             'icon': icon,
             'instructions': instructions,
-            'completed': result_qs.exists(),
-            'score': result_qs.first().score if result_qs.exists() else None
+            'completed': completed_result_qs.exists(),
+            'score': completed_result_qs.first().score if completed_result_qs.exists() else None
         })
     
     context = {
@@ -95,36 +97,57 @@ def play_game(request, game_type):
 @csrf_exempt
 @require_http_methods(["POST"])
 @login_required
-def save_game_result(request):
-    """Save game result from AJAX request"""
+def save_score(request):
+    """Save game score and detailed event data from an AJAX request."""
     try:
         data = json.loads(request.body)
-        
-        # Create game session
+
+        # Flexible validation for redesigned games
+        required_fields = ['game_name', 'score', 'completion_status', 'events']
+        if not all(field in data for field in required_fields):
+            return JsonResponse({'success': False, 'error': 'Missing required fields'}, status=400)
+
+        # Create a game session
         session = GameSession.objects.create(
             user=request.user,
-            is_completed=True
+            is_completed=(data.get('completion_status') == 'completed')
         )
-        
-        # Create game result
+
+        # Determine duration from events if not provided directly
+        duration_ms = data.get('duration_ms')
+        if not duration_ms and data.get('events'):
+            events = data['events']
+            if len(events) > 1:
+                start_time = events[0].get('timestamp')
+                end_time = events[-1].get('timestamp')
+                if start_time and end_time:
+                    duration_ms = end_time - start_time
+            if not duration_ms:
+                 duration_ms = 0 # Fallback
+        elif not duration_ms:
+            duration_ms = 0 # Fallback
+
+        # Create the game result
         result = GameResult.objects.create(
             user=request.user,
             session=session,
-            game_type=data['game_type'],
+            game_type=data['game_name'],
             score=data['score'],
-            duration=data['duration'],
-            decisions=data.get('decisions', []),
-            reaction_times=data.get('reaction_times', []),
-            raw_data=data.get('raw_data', {})
+            duration=duration_ms,
+            completion_status=data['completion_status'],
+            decisions=data.get('events', []),
+            raw_data=data.get('game_specific_data', data.get('raw_data', {}))
         )
-        
+
         return JsonResponse({
             'success': True,
+            'message': 'Result saved successfully',
             'result_id': result.id
         })
-        
+
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        }, status=400)
+        # import logging
+        # logging.exception(f"Error saving game result for user {request.user.id}")
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)

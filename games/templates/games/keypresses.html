@@ -3,164 +3,350 @@
 <div class="max-w-lg mx-auto mt-4">
     <button id="back-to-games" class="inline-block mb-4 px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300">← Back to Games</button>
 </div>
-<div class="game-container max-w-lg mx-auto mt-8 p-6 bg-white rounded shadow">
-    <h2 class="text-2xl font-bold mb-2">Keypresses Game</h2>
-    <p class="mb-4">Press the spacebar as many times as you can in <span id="duration">10</span> seconds. Try to maximize your keypress count!</p>
-    <div id="game-area">
-        <div class="mb-2">Current keypresses: <span id="score">0</span></div>
-        <button id="start-btn" class="bg-blue-500 text-white px-4 py-2 rounded">Start</button>
-        <div id="feedback" class="mt-3 text-blue-600 font-semibold"></div>
-    </div>
+<style>
+    :root {
+        --bg-color: #1a1a1a;
+        --primary-color: #2c2c2c;
+        --secondary-color: #444;
+        --accent-color: #00aaff;
+        --text-color: #f0f0f0;
+        --success-color: #4ade80;
+        --error-color: #f87171;
+    }
+    .game-container {
+        background-color: var(--bg-color);
+        color: var(--text-color);
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        border: 1px solid var(--secondary-color);
+        border-radius: 12px;
+        padding: 2rem;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+    }
+    .dashboard {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 1rem;
+        margin-bottom: 2rem;
+        padding: 1rem;
+        background-color: var(--primary-color);
+        border-radius: 8px;
+    }
+    .metric {
+        text-align: center;
+    }
+    .metric-title {
+        font-size: 0.9rem;
+        color: #aaa;
+        text-transform: uppercase;
+    }
+    .metric-value {
+        font-size: 1.8rem;
+        font-weight: bold;
+        color: var(--accent-color);
+    }
+    #game-area {
+        height: 250px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background-color: var(--primary-color);
+        border-radius: 8px;
+        position: relative;
+        overflow: hidden;
+    }
+    #target-letter {
+        font-size: 8rem;
+        font-weight: bold;
+        color: var(--text-color);
+        transition: transform 0.1s ease, color 0.1s ease;
+    }
+    .feedback-indicator {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 10rem;
+        font-weight: bold;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+    .modal {
+        display: flex; /* Initially hidden, changed to flex by JS */
+        position: fixed;
+        z-index: 100;
+        left: 0; top: 0;
+        width: 100%; height: 100%;
+        background-color: rgba(0,0,0,0.7);
+        justify-content: center;
+        align-items: center;
+    }
+    .modal-content {
+        background-color: var(--primary-color);
+        padding: 2rem;
+        border-radius: 12px;
+        border: 1px solid var(--secondary-color);
+        width: 90%;
+        max-width: 500px;
+        text-align: center;
+    }
+    .modal-content h2 { font-size: 2rem; margin-bottom: 1rem; }
+    .modal-content p { margin-bottom: 1.5rem; color: #ccc; }
+    .modal-btn {
+        background-color: var(--accent-color);
+        color: var(--text-color);
+        padding: 0.8rem 1.5rem;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 1rem;
+        transition: background-color 0.2s ease;
+    }
+    .modal-btn:hover { background-color: #0088cc; }
+</style>
 
+<div class="game-container max-w-2xl mx-auto mt-8">
+    <h2 class="text-3xl font-bold mb-4 text-center">Rhythmic Precision Task</h2>
+    <div class="dashboard">
+        <div class="metric">
+            <div class="metric-title">Score</div>
+            <div id="score" class="metric-value">0</div>
+        </div>
+        <div class="metric">
+            <div class="metric-title">Accuracy</div>
+            <div id="accuracy" class="metric-value">100%</div>
+        </div>
+        <div class="metric">
+            <div class="metric-title">Avg. Reaction</div>
+            <div id="avg-reaction" class="metric-value">0ms</div>
+        </div>
+        <div class="metric">
+            <div class="metric-title">Time</div>
+            <div id="timer" class="metric-value">60</div>
+        </div>
+    </div>
+    <div id="game-area">
+        <div id="target-letter"></div>
+        <div id="feedback-indicator" class="feedback-indicator"></div>
+    </div>
+</div>
+
+<!-- Instruction Modal -->
+<div id="instruction-modal" class="modal">
+    <div class="modal-content">
+        <h2>Rhythmic Precision Task</h2>
+        <p>When the game starts, letters will appear one by one. Press the corresponding key on your keyboard as quickly and accurately as you can.</p>
+        <p>The game lasts for 60 seconds. Aim for the highest score and accuracy!</p>
+        <button id="start-game-btn" class="modal-btn">Start Game</button>
+    </div>
+</div>
+
+<!-- Final Results Modal -->
+<div id="final-results-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <h2>Game Over!</h2>
+        <p id="final-score">Your score: 0</p>
+        <p id="final-summary">Accuracy: 100% | Avg. Reaction: 0ms</p>
+        <a href="/games/" class="modal-btn">Back to Games</a>
+    </div>
 </div>
 <script>
-const GAME_DURATION = 10; // seconds
-let score = 0;
-let events = [];
-let difficulty = 'medium';
-let startTime = null;
-let interval = null;
-let running = false;
-let gameCompleted = false; // Flag to indicate if the game has been completed
+document.addEventListener('DOMContentLoaded', () => {
+    // Game Elements
+    const elements = {
+        score: document.getElementById('score'),
+        accuracy: document.getElementById('accuracy'),
+        avgReaction: document.getElementById('avg-reaction'),
+        timer: document.getElementById('timer'),
+        targetLetter: document.getElementById('target-letter'),
+        feedback: document.getElementById('feedback-indicator'),
+        instructionModal: document.getElementById('instruction-modal'),
+        finalResultsModal: document.getElementById('final-results-modal'),
+        startGameBtn: document.getElementById('start-game-btn'),
+        backToGamesBtn: document.getElementById('back-to-games')
+    };
 
-function logEvent(type, data) {
-    events.push({
-        event_type: type,
-        score: score,
-        difficulty: difficulty,
-        timestamp: Date.now(),
-        ...data
-    });
-}
+    // Game Config
+    const GAME_DURATION = 60; // seconds
+    const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
-function updateUI() {
-    document.getElementById('score').textContent = score;
-    document.getElementById('feedback').textContent = '';
-}
+    // Game State
+    let state = {
+        score: 0,
+        hits: 0,
+        misses: 0,
+        reactionTimes: [],
+        timeLeft: GAME_DURATION,
+        currentTarget: null,
+        trialStartTime: 0,
+        gameStartTime: 0,
+        gameInterval: null,
+        gameCompleted: false,
+        isResponding: false,
+        eventsLog: []
+    };
 
-document.getElementById('start-btn').onclick = function() {
-    if (running) return;
-    running = true;
-    score = 0;
-    events = [];
-    updateUI();
-    document.getElementById('feedback').textContent = 'Go! Press the spacebar!';
-    startTime = Date.now();
-    logEvent('start', {});
-    window.addEventListener('keydown', keyHandler);
-    interval = setTimeout(endGame, GAME_DURATION * 1000);
-};
-
-function keyHandler(e) {
-    if (!running) return;
-    if (e.code === 'Space') {
-        score++;
-        logEvent('keypress', {reaction_time: Date.now() - startTime, key: 'Space'});
-        updateUI();
-    }
-}
-
-function endGame() {
-    running = false;
-    window.removeEventListener('keydown', keyHandler);
-    document.getElementById('feedback').textContent = `Game Over! Final keypresses: ${score}`;
-    logEvent('end', {final_score: score});
-    // Mark that we're saving to backend to avoid duplicate saves
-    logEvent('backend_saved', {});
-    sendEventsToBackend();
-    gameCompleted = true; // Mark game as completed
-}
-
-document.getElementById('back-to-games').onclick = function() {
-    // Disable the button to prevent double clicks
-    document.getElementById('back-to-games').disabled = true;
-    // If game is running, stop it first
-    if (running) {
-        clearTimeout(interval);
-        running = false;
-        window.removeEventListener('keydown', keyHandler);
-        document.getElementById('start-btn').disabled = true;
-        document.getElementById('game-area').innerHTML = `<div class='font-bold text-lg text-red-600'>Session Ended! Final keypresses: ${score}`;
-        logEvent('manual_end', {final_score: score});
-        // Save data and then redirect
-        sendEventsToBackend().then(() => {
-            window.location.href = '/games/';
-        }).catch(() => {
-            // Even if save fails, still redirect
-            window.location.href = '/games/';
-        });
-    } else if (typeof gameCompleted !== 'undefined' && gameCompleted) {
-        // Game is completed, ensure data is saved before redirecting
-        // Check if we need to save the completed game data
-        if (events.length > 0 && !events.some(e => e.event_type === 'backend_saved')) {
-            // Mark that we're saving to backend to avoid duplicate saves
-            logEvent('backend_saved', {});
-            sendEventsToBackend().then(() => {
-                window.location.href = '/games/';
-            }).catch(() => {
-                // Even if save fails, still redirect
-                window.location.href = '/games/';
-            });
-        } else {
-            // Data already saved or no data to save, safe to redirect
-            window.location.href = '/games/';
-        }
-    } else {
-        document.getElementById('start-btn').disabled = true;
-        document.getElementById('game-area').innerHTML = `<div class='font-bold text-lg text-red-600'>Session Ended! Final keypresses: ${score}`;
-        logEvent('manual_end', {final_score: score});
-        // Save data and then redirect
-        sendEventsToBackend().then(() => {
-            window.location.href = '/games/';
-        }).catch(() => {
-            // Even if save fails, still redirect
-            window.location.href = '/games/';
-        });
-    }
-};
-
-function sendEventsToBackend() {
-    return fetch('/games/save_game_result/', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': getCookie('csrftoken')
-        },
-        body: JSON.stringify({
-            game_type: 'keypresses',
-            score: score,
-            duration: GAME_DURATION,
-            decisions: events.filter(e => e.event_type === 'keypress'),
-            reaction_times: events.filter(e => e.event_type === 'keypress').map(e => e.reaction_time),
-            raw_data: {events: events}
-        })
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.success) {
-            console.log('Session saved successfully');
-        } else {
-            console.error('Error saving session: ' + data.error);
-        }
-        return data;
-    });
-}
-
-function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
             }
         }
+        return cookieValue;
     }
-    return cookieValue;
-}
 
-updateUI();
+    function logEvent(type, data) {
+        state.eventsLog.push({
+            event_type: type,
+            timestamp: Date.now() - state.gameStartTime,
+            time_left: state.timeLeft,
+            ...data
+        });
+    }
+
+    function updateDashboard() {
+        const totalTrials = state.hits + state.misses;
+        const accuracy = totalTrials > 0 ? (state.hits / totalTrials * 100).toFixed(0) : 100;
+        const avgReaction = state.reactionTimes.length > 0 ? (state.reactionTimes.reduce((a, b) => a + b, 0) / state.reactionTimes.length).toFixed(0) : 0;
+        
+        elements.score.textContent = state.score;
+        elements.accuracy.textContent = `${accuracy}%`;
+        elements.avgReaction.textContent = `${avgReaction}ms`;
+        elements.timer.textContent = state.timeLeft;
+    }
+
+    function generateTrial() {
+        if (state.timeLeft <= 0) return;
+        state.isResponding = false;
+        state.currentTarget = ALPHABET[Math.floor(Math.random() * ALPHABET.length)];
+        elements.targetLetter.textContent = state.currentTarget;
+        elements.targetLetter.style.color = 'var(--text-color)';
+        state.trialStartTime = Date.now();
+        logEvent('trial_start', { target_letter: state.currentTarget });
+    }
+
+    function handleKeyPress(e) {
+        if (state.isResponding || state.timeLeft <= 0 || !state.currentTarget) return;
+        
+        const key = e.key.toUpperCase();
+        if (ALPHABET.includes(key)) {
+            state.isResponding = true;
+            const reactionTime = Date.now() - state.trialStartTime;
+            const isCorrect = key === state.currentTarget;
+
+            logEvent('response', { key_pressed: key, is_correct: isCorrect, reaction_time: reactionTime });
+
+            if (isCorrect) {
+                state.hits++;
+                state.reactionTimes.push(reactionTime);
+                state.score += 100 + Math.max(0, 50 - Math.floor(reactionTime / 100));
+                showFeedback(true);
+            } else {
+                state.misses++;
+                showFeedback(false);
+            }
+            
+            updateDashboard();
+            setTimeout(generateTrial, 300); // Brief pause before next letter
+        }
+    }
+
+    function showFeedback(isCorrect) {
+        elements.targetLetter.style.color = isCorrect ? 'var(--success-color)' : 'var(--error-color)';
+        elements.feedback.textContent = isCorrect ? '✓' : '✗';
+        elements.feedback.style.color = isCorrect ? 'var(--success-color)' : 'var(--error-color)';
+        elements.feedback.style.opacity = 1;
+        setTimeout(() => { elements.feedback.style.opacity = 0; }, 300);
+    }
+
+    function startGame() {
+        elements.instructionModal.style.display = 'none';
+        state.gameStartTime = Date.now();
+        logEvent('game_start', {});
+        window.addEventListener('keydown', handleKeyPress);
+        
+        state.gameInterval = setInterval(() => {
+            state.timeLeft--;
+            updateDashboard();
+            if (state.timeLeft <= 0) {
+                endGame();
+            }
+        }, 1000);
+
+        generateTrial();
+    }
+
+    function endGame() {
+        state.gameCompleted = true;
+        clearInterval(state.gameInterval);
+        window.removeEventListener('keydown', handleKeyPress);
+        elements.targetLetter.textContent = '';
+        logEvent('game_end', { final_score: state.score, hits: state.hits, misses: state.misses });
+
+        const totalTrials = state.hits + state.misses;
+        const finalAccuracy = totalTrials > 0 ? (state.hits / totalTrials * 100).toFixed(1) : 'N/A';
+        const finalAvgReaction = state.reactionTimes.length > 0 ? (state.reactionTimes.reduce((a, b) => a + b, 0) / state.reactionTimes.length).toFixed(0) : 'N/A';
+
+        document.getElementById('final-score').textContent = `Your score: ${state.score}`;
+        document.getElementById('final-summary').textContent = `Accuracy: ${finalAccuracy}% | Avg. Reaction: ${finalAvgReaction}ms`;
+        elements.finalResultsModal.style.display = 'flex';
+
+        saveGameResult();
+    }
+
+    function quitGame() {
+        state.gameCompleted = false;
+        clearInterval(state.gameInterval);
+        window.removeEventListener('keydown', handleKeyPress);
+        logEvent('game_quit', { final_score: state.score });
+        const savePromise = saveGameResult();
+        // Ensure data is sent before redirecting
+        savePromise.finally(() => { window.location.href = '/games/'; });
+    }
+
+    function saveGameResult() {
+        const duration = (Date.now() - state.gameStartTime) / 1000;
+        const payload = {
+            game_type: 'rhythmic_precision',
+            score: state.score,
+            duration: duration.toFixed(2),
+            completion_status: state.gameCompleted ? 'completed' : 'abandoned',
+            raw_data: {
+                hits: state.hits,
+                misses: state.misses,
+                reaction_times: state.reactionTimes,
+                events: state.eventsLog
+            }
+        };
+
+        return fetch('/games/save-result/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify(payload)
+        }).then(res => {
+            if (!res.ok) console.error('Failed to save game data.');
+            return res.json();
+        }).catch(error => console.error('Error saving game data:', error));
+    }
+
+    // Event Listeners
+    elements.startGameBtn.addEventListener('click', startGame);
+    elements.backToGamesBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (state.timeLeft > 0 && state.timeLeft < GAME_DURATION) {
+            quitGame();
+        } else {
+            window.location.href = '/games/';
+        }
+    });
+});
 </script>
 {% endblock %}

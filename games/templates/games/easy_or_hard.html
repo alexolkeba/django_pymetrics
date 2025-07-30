@@ -3,154 +3,337 @@
 <div class="max-w-lg mx-auto mt-4">
     <button id="back-to-games" class="inline-block mb-4 px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300">← Back to Games</button>
 </div>
-<div class="game-container max-w-lg mx-auto mt-8 p-6 bg-white rounded shadow">
-    <h2 class="text-2xl font-bold mb-2">Easy or Hard Game</h2>
-    <p class="mb-4">Choose between an easy or hard task each round. Hard tasks give more points but are more difficult. Try to maximize your score over <span id="total-rounds">5</span> rounds.</p>
-    <div id="game-area">
-        <div id="round-info" class="mb-2 font-semibold">Round <span id="round-num">1</span> of <span id="total-rounds-2">5</span></div>
-        <div class="mb-2">Current score: <span id="score">0</span></div>
-        <button id="easy-btn" class="bg-green-500 text-white px-4 py-2 rounded mr-2">Easy Task (+1)</button>
-        <button id="hard-btn" class="bg-red-500 text-white px-4 py-2 rounded">Hard Task (+3)</button>
-        <div id="feedback" class="mt-3 text-blue-600 font-semibold"></div>
-    </div>
+<style>
+    :root {
+        --bg-color: #1a1a1a;
+        --primary-color: #2c2c2c;
+        --secondary-color: #444;
+        --accent-color: #00aaff;
+        --text-color: #f0f0f0;
+        --easy-color: #4ade80;
+        --hard-color: #f87171;
+    }
+    .game-container {
+        background-color: var(--bg-color);
+        color: var(--text-color);
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        border: 1px solid var(--secondary-color);
+        border-radius: 12px;
+        padding: 2rem;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+    }
+    .dashboard {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
+        margin-bottom: 2rem;
+        padding: 1rem;
+        background-color: var(--primary-color);
+        border-radius: 8px;
+    }
+    .metric {
+        text-align: center;
+    }
+    .metric-title { font-size: 0.9rem; color: #aaa; text-transform: uppercase; }
+    .metric-value { font-size: 1.8rem; font-weight: bold; color: var(--accent-color); }
+    #game-area {
+        min-height: 250px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        background-color: var(--primary-color);
+        border-radius: 8px;
+        padding: 2rem;
+        transition: background-color 0.3s ease;
+    }
+    .choice-container {
+        display: flex;
+        gap: 2rem;
+        width: 100%;
+    }
+    .choice-card {
+        flex: 1;
+        padding: 1.5rem;
+        border-radius: 8px;
+        border: 2px solid var(--secondary-color);
+        text-align: center;
+        cursor: pointer;
+        transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+    .choice-card:hover { transform: translateY(-5px); }
+    .choice-card.easy { border-color: var(--easy-color); }
+    .choice-card.easy:hover { background-color: rgba(74, 222, 128, 0.1); }
+    .choice-card.hard { border-color: var(--hard-color); }
+    .choice-card.hard:hover { background-color: rgba(248, 113, 113, 0.1); }
+    .choice-title { font-size: 1.5rem; font-weight: bold; margin-bottom: 0.5rem; }
+    .choice-desc { font-size: 1rem; color: #ccc; margin-bottom: 1rem; }
+    .choice-reward { font-size: 1.2rem; font-weight: bold; }
+    .easy .choice-reward { color: var(--easy-color); }
+    .hard .choice-reward { color: var(--hard-color); }
+    #task-container {
+        display: none;
+        text-align: center;
+    }
+    #math-problem { font-size: 2.5rem; font-weight: bold; margin-bottom: 1.5rem; }
+    #math-input {
+        background-color: var(--secondary-color);
+        border: 1px solid #555;
+        color: var(--text-color);
+        font-size: 1.5rem;
+        padding: 0.5rem;
+        width: 100px;
+        text-align: center;
+        border-radius: 4px;
+        margin-bottom: 1rem;
+    }
+    #feedback { margin-top: 1rem; font-size: 1.2rem; font-weight: bold; min-height: 2rem; }
+    .modal { display: flex; position: fixed; z-index: 100; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); justify-content: center; align-items: center; }
+    .modal-content { background-color: var(--primary-color); padding: 2rem; border-radius: 12px; border: 1px solid var(--secondary-color); width: 90%; max-width: 500px; text-align: center; }
+    .modal-content h2 { font-size: 2rem; margin-bottom: 1rem; }
+    .modal-content p { margin-bottom: 1.5rem; color: #ccc; }
+    .modal-btn { background-color: var(--accent-color); color: var(--text-color); padding: 0.8rem 1.5rem; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; transition: background-color 0.2s ease; }
+    .modal-btn:hover { background-color: #0088cc; }
+</style>
 
+<div class="game-container max-w-2xl mx-auto mt-8">
+    <h2 class="text-3xl font-bold mb-4 text-center">Cognitive Effort Task</h2>
+    <div class="dashboard">
+        <div class="metric">
+            <div class="metric-title">Score</div>
+            <div id="score" class="metric-value">0</div>
+        </div>
+        <div class="metric">
+            <div class="metric-title">Round</div>
+            <div id="round" class="metric-value">1/12</div>
+        </div>
+    </div>
+    <div id="game-area">
+        <div id="choice-container" class="choice-container">
+            <div id="easy-choice" class="choice-card easy">
+                <div class="choice-title">Easy Task</div>
+                <div class="choice-desc">Guaranteed points.</div>
+                <div id="easy-reward" class="choice-reward">+10 Points</div>
+            </div>
+            <div id="hard-choice" class="choice-card hard">
+                <div class="choice-title">Hard Task</div>
+                <div class="choice-desc">Solve a math problem for a bigger reward.</div>
+                <div id="hard-reward" class="choice-reward">+50 Points</div>
+            </div>
+        </div>
+        <div id="task-container">
+            <div id="math-problem"></div>
+            <input type="number" id="math-input" />
+            <button id="submit-answer-btn" class="modal-btn">Submit</button>
+        </div>
+        <div id="feedback"></div>
+    </div>
+</div>
+
+<!-- Instruction Modal -->
+<div id="instruction-modal" class="modal">
+    <div class="modal-content">
+        <h2>Cognitive Effort Task</h2>
+        <p>In each round, you will choose between an easy task with a small, guaranteed reward, and a hard task with a larger, potential reward.</p>
+        <p>The hard task requires you to solve a simple math problem within a time limit.</p>
+        <button id="start-game-btn" class="modal-btn">Start Game</button>
+    </div>
+</div>
+
+<!-- Final Results Modal -->
+<div id="final-results-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <h2>Task Complete!</h2>
+        <p id="final-score">Your final score: 0</p>
+        <p id="final-summary">You chose the hard task X times.</p>
+        <a href="/games/" class="modal-btn">Back to Games</a>
+    </div>
 </div>
 <script>
-const TOTAL_ROUNDS = 5;
-let currentRound = 1;
-let score = 0;
-let events = [];
-let difficulty = 'medium';
+document.addEventListener('DOMContentLoaded', () => {
+    // Config
+    const TOTAL_ROUNDS = 12;
+    const REWARDS = { easy: 10, hard: 50 };
+    const HARD_TASK_TIME_LIMIT = 5000; // 5 seconds
 
-function logEvent(type, data) {
-    events.push({
-        event_type: type,
-        round: currentRound,
-        score: score,
-        difficulty: difficulty,
-        timestamp: Date.now(),
-        ...data
-    });
-}
+    // Elements
+    const elements = {
+        score: document.getElementById('score'),
+        round: document.getElementById('round'),
+        choiceContainer: document.getElementById('choice-container'),
+        taskContainer: document.getElementById('task-container'),
+        easyChoice: document.getElementById('easy-choice'),
+        hardChoice: document.getElementById('hard-choice'),
+        mathProblem: document.getElementById('math-problem'),
+        mathInput: document.getElementById('math-input'),
+        submitAnswerBtn: document.getElementById('submit-answer-btn'),
+        feedback: document.getElementById('feedback'),
+        instructionModal: document.getElementById('instruction-modal'),
+        finalResultsModal: document.getElementById('final-results-modal'),
+        startGameBtn: document.getElementById('start-game-btn'),
+        backToGamesBtn: document.getElementById('back-to-games')
+    };
 
-function updateUI() {
-    document.getElementById('round-num').textContent = currentRound;
-    document.getElementById('total-rounds').textContent = TOTAL_ROUNDS;
-    document.getElementById('total-rounds-2').textContent = TOTAL_ROUNDS;
-    document.getElementById('score').textContent = score;
-    document.getElementById('feedback').textContent = '';
-}
+    // State
+    let state = {
+        score: 0,
+        currentRound: 0,
+        hardTasksChosen: 0,
+        gameStartTime: 0,
+        roundStartTime: 0,
+        gameCompleted: false,
+        isResponding: false,
+        mathCorrectAnswer: 0,
+        taskTimer: null,
+        eventsLog: []
+    };
 
-document.getElementById('easy-btn').onclick = function() {
-    logEvent('choose_easy', {});
-    score += 1;
-    document.getElementById('feedback').textContent = 'You chose the easy task (+1).';
-    nextRound();
-};
-
-document.getElementById('hard-btn').onclick = function() {
-    // Simulate success/failure based on difficulty
-    const success = Math.random() < (difficulty === 'easy' ? 0.9 : difficulty === 'hard' ? 0.5 : 0.7);
-    logEvent('choose_hard', {success: success});
-    if (success) {
-        score += 3;
-        document.getElementById('feedback').textContent = 'You succeeded at the hard task (+3)!';
-    } else {
-        document.getElementById('feedback').textContent = 'You failed the hard task (0 points).';
-    }
-    nextRound();
-};
-
-function nextRound() {
-    if (currentRound < TOTAL_ROUNDS) {
-        currentRound++;
-        setTimeout(() => {
-            updateUI();
-        }, 1000);
-    } else {
-        document.getElementById('game-area').innerHTML = `<div class='font-bold text-lg'>Game Over! Final score: ${score}</div>`;
-        logEvent('end', {final_score: score});
-        // Mark that we're saving to backend to avoid duplicate saves
-        logEvent('backend_saved', {});
-        sendEventsToBackend();
-    }
-}
-
-document.getElementById('back-to-games').onclick = function() {
-    // If game is still active, end session first
-    if (currentRound <= TOTAL_ROUNDS) {
-        logEvent('manual_end', {final_score: score});
-        document.getElementById('easy-btn').disabled = true;
-        document.getElementById('hard-btn').disabled = true;
-        document.getElementById('game-area').innerHTML = `<div class='font-bold text-lg text-red-600'>Session Ended! Final score: ${score}</div>`;
-        // Save data and then redirect
-        sendEventsToBackend().then(() => {
-            window.location.href = '/games/';
-        }).catch(() => {
-            // Even if save fails, still redirect
-            window.location.href = '/games/';
-        });
-    } else {
-        // Game is completed, ensure data is saved before redirecting
-        // Check if we need to save the completed game data
-        if (events.length > 0 && !events.some(e => e.event_type === 'backend_saved')) {
-            // Mark that we're saving to backend to avoid duplicate saves
-            logEvent('backend_saved', {});
-            sendEventsToBackend().then(() => {
-                window.location.href = '/games/';
-            }).catch(() => {
-                // Even if save fails, still redirect
-                window.location.href = '/games/';
-            });
-        } else {
-            // Data already saved or no data to save, safe to redirect
-            window.location.href = '/games/';
-        }
-    }
-};
-
-function sendEventsToBackend() {
-    return fetch('/games/save_game_result/', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': getCookie('csrftoken')
-        },
-        body: JSON.stringify({
-            game_type: 'easy_or_hard',
-            score: score,
-            duration: TOTAL_ROUNDS * 10,
-            decisions: events.filter(e => e.event_type.startsWith('choose_')),
-            reaction_times: [],
-            raw_data: {events: events}
-        })
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.success) {
-            console.log('Session saved successfully');
-        } else {
-            console.error('Error saving session: ' + data.error);
-        }
-        return data;
-    });
-}
-
-function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
             }
         }
+        return cookieValue;
     }
-    return cookieValue;
-}
 
-updateUI();
+    function logEvent(type, data) {
+        state.eventsLog.push({ event_type: type, round: state.currentRound + 1, timestamp: Date.now() - state.gameStartTime, ...data });
+    }
+
+    function updateDashboard() {
+        elements.score.textContent = state.score;
+        elements.round.textContent = `${state.currentRound}/${TOTAL_ROUNDS}`;
+    }
+
+    function showFeedback(message, color) {
+        elements.feedback.textContent = message;
+        elements.feedback.style.color = `var(--${color})`;
+    }
+
+    function presentChoicePhase() {
+        state.isResponding = false;
+        elements.taskContainer.style.display = 'none';
+        elements.choiceContainer.style.display = 'flex';
+        elements.feedback.textContent = '';
+        updateDashboard();
+        state.roundStartTime = Date.now();
+        logEvent('choice_phase_start', { easy_reward: REWARDS.easy, hard_reward: REWARDS.hard });
+    }
+
+    function handleEasyChoice() {
+        if (state.isResponding) return;
+        state.isResponding = true;
+        const rt = Date.now() - state.roundStartTime;
+        logEvent('choice_made', { choice: 'easy', reaction_time: rt });
+        state.score += REWARDS.easy;
+        showFeedback(`+${REWARDS.easy} points!`, 'easy-color');
+        setTimeout(nextRound, 1500);
+    }
+
+    function handleHardChoice() {
+        if (state.isResponding) return;
+        state.isResponding = true;
+        const rt = Date.now() - state.roundStartTime;
+        state.hardTasksChosen++;
+        logEvent('choice_made', { choice: 'hard', reaction_time: rt });
+        presentHardTask();
+    }
+
+    function presentHardTask() {
+        elements.choiceContainer.style.display = 'none';
+        elements.taskContainer.style.display = 'block';
+        const num1 = Math.floor(Math.random() * 10) + 1;
+        const num2 = Math.floor(Math.random() * 10) + 1;
+        state.mathCorrectAnswer = num1 + num2;
+        elements.mathProblem.textContent = `${num1} + ${num2} = ?`;
+        elements.mathInput.value = '';
+        elements.mathInput.focus();
+        logEvent('hard_task_start', { problem: `${num1} + ${num2}` });
+        state.taskTimer = setTimeout(() => handleSubmitAnswer(true), HARD_TASK_TIME_LIMIT);
+    }
+
+    function handleSubmitAnswer(timedOut = false) {
+        clearTimeout(state.taskTimer);
+        const answer = parseInt(elements.mathInput.value, 10);
+        const isCorrect = !timedOut && answer === state.mathCorrectAnswer;
+        logEvent('hard_task_end', { answer, correct_answer: state.mathCorrectAnswer, is_correct: isCorrect, timed_out: timedOut });
+        if (isCorrect) {
+            state.score += REWARDS.hard;
+            showFeedback(`Correct! +${REWARDS.hard} points!`, 'success-color');
+        } else {
+            showFeedback(timedOut ? 'Time is up!' : 'Incorrect.', 'error-color');
+        }
+        setTimeout(nextRound, 1500);
+    }
+
+    function nextRound() {
+        state.currentRound++;
+        if (state.currentRound >= TOTAL_ROUNDS) {
+            endGame();
+        } else {
+            presentChoicePhase();
+        }
+    }
+
+    function startGame() {
+        elements.instructionModal.style.display = 'none';
+        state.gameStartTime = Date.now();
+        logEvent('game_start', {});
+        presentChoicePhase();
+    }
+
+    function endGame() {
+        state.gameCompleted = true;
+        logEvent('game_end', { final_score: state.score, hard_tasks_chosen: state.hardTasksChosen });
+        document.getElementById('final-score').textContent = `Your final score: ${state.score}`;
+        document.getElementById('final-summary').textContent = `You chose the hard task ${state.hardTasksChosen} times.`;
+        elements.finalResultsModal.style.display = 'flex';
+        saveGameResult();
+    }
+
+    function quitGame() {
+        state.gameCompleted = false;
+        logEvent('game_quit', { final_score: state.score });
+        saveGameResult().finally(() => { window.location.href = '/games/'; });
+    }
+
+    function saveGameResult() {
+        const duration = (Date.now() - state.gameStartTime) / 1000;
+        const payload = {
+            game_type: 'cognitive_effort',
+            score: state.score,
+            duration: duration.toFixed(2),
+            completion_status: state.gameCompleted ? 'completed' : 'abandoned',
+            raw_data: { hard_tasks_chosen: state.hardTasksChosen, total_rounds: state.currentRound, events: state.eventsLog }
+        };
+        return fetch('/games/save-result/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+            body: JSON.stringify(payload)
+        }).then(res => res.json()).catch(error => console.error('Error saving game data:', error));
+    }
+
+    // Event Listeners
+    elements.startGameBtn.addEventListener('click', startGame);
+    elements.easyChoice.addEventListener('click', handleEasyChoice);
+    elements.hardChoice.addEventListener('click', handleHardChoice);
+    elements.submitAnswerBtn.addEventListener('click', () => handleSubmitAnswer(false));
+    elements.mathInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') handleSubmitAnswer(false); });
+    elements.backToGamesBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (state.currentRound > 0 && state.currentRound < TOTAL_ROUNDS) {
+            quitGame();
+        } else {
+            window.location.href = '/games/';
+        }
+    });
+});
 </script>
 {% endblock %}

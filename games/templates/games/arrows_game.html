@@ -1,164 +1,317 @@
 {% extends 'base.html' %}
+{% load static %}
 {% block content %}
-<div class="max-w-lg mx-auto mt-4">
-    <button id="back-to-games" class="inline-block mb-4 px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300">← Back to Games</button>
-</div>
-<div class="game-container max-w-lg mx-auto mt-8 p-6 bg-white rounded shadow">
-    <h2 class="text-2xl font-bold mb-2">Arrows Game</h2>
-    <p class="mb-4">Respond to the direction of the arrow as quickly as possible. Try to maximize your correct responses over <span id="total-rounds">10</span> rounds.</p>
-    <div id="game-area">
-        <div id="round-info" class="mb-2 font-semibold">Round <span id="round-num">1</span> of <span id="total-rounds-2">10</span></div>
-        <div class="mb-2">Current score: <span id="score">0</span></div>
-        <div id="arrow" class="text-6xl my-4">➡️</div>
-        <div class="flex space-x-2 mb-2">
-            <button class="arrow-btn bg-blue-500 text-white px-4 py-2 rounded" data-dir="left">⬅️ Left</button>
-            <button class="arrow-btn bg-green-500 text-white px-4 py-2 rounded" data-dir="right">➡️ Right</button>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+<style>
+    :root {
+        --primary-color: #A78BFA; /* Lavender */
+        --secondary-color: #334155;
+        --background-color: #0F172A;
+        --surface-color: #1E293B;
+        --text-color: #F1F5F9;
+        --muted-text-color: #94A3B8;
+        --border-color: #334155;
+        --correct-color: #4ADE80;
+        --incorrect-color: #F87171;
+    }
+    .game-body { background-color: var(--background-color); color: var(--text-color); font-family: 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 1rem; }
+    .game-container { background-color: var(--surface-color); border-radius: 12px; border: 1px solid var(--border-color); box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3); width: 100%; max-width: 900px; overflow: hidden; }
+    .game-header { background-color: rgba(0,0,0,0.2); padding: 1.5rem; text-align: center; border-bottom: 1px solid var(--border-color); }
+    .game-header h2 { font-size: 1.75rem; font-weight: bold; margin: 0; }
+    .dashboard { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; padding: 1.5rem; border-bottom: 1px solid var(--border-color); }
+    .stat-card { background-color: var(--secondary-color); padding: 1rem; border-radius: 8px; text-align: center; }
+    .stat-card .value { font-size: 1.5rem; font-weight: bold; color: var(--primary-color); }
+    .stat-card .label { font-size: 0.8rem; color: var(--muted-text-color); text-transform: uppercase; }
+    .game-area { padding: 2rem; min-height: 300px; display: flex; flex-direction: column; justify-content: center; align-items: center; position: relative; font-family: 'Courier New', Courier, monospace; }
+    .stimulus { font-size: 5rem; font-weight: bold; letter-spacing: 0.2em; }
+    .feedback-text { position: absolute; bottom: 20px; font-size: 1.5rem; font-weight: bold; }
+    .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); justify-content: center; align-items: center; }
+    .modal-content { background-color: var(--surface-color); padding: 2rem; border-radius: 12px; border: 1px solid var(--border-color); max-width: 550px; width: 90%; text-align: center; box-shadow: 0 5px 15px rgba(0,0,0,0.5); animation: modal-pop 0.3s ease-out; }
+    @keyframes modal-pop { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    .btn { padding: 0.75rem 1.5rem; border: none; border-radius: 8px; font-size: 1rem; font-weight: bold; cursor: pointer; transition: background-color 0.2s; color: var(--background-color); background-color: var(--primary-color); }
+    .btn:hover { background-color: #C4B5FD; }
+    #back-to-games { position: absolute; top: 20px; left: 20px; background-color: rgba(0, 0, 0, 0.3); color: var(--text-color); padding: 0.5rem 1rem; border-radius: 8px; text-decoration: none; font-weight: bold; z-index: 10; }
+</style>
+
+<div class="game-body" data-game-list-url="{% url 'games:game_list' %}" data-csrf-token="{{ csrf_token }}">
+    <a href="#" id="back-to-games"><i class="fas fa-arrow-left"></i> Back to Games</a>
+
+    <div class="game-container">
+        <div class="game-header">
+            <h2>Flanker Task</h2>
         </div>
-        <div id="feedback" class="mt-3 text-blue-600 font-semibold"></div>
+
+        <div class="dashboard">
+            <div class="stat-card"><div id="flanker-effect" class="value">-</div><div class="label">Flanker Effect (ms)</div></div>
+            <div class="stat-card"><div id="avg-rt" class="value">-</div><div class="label">Avg. Reaction Time</div></div>
+            <div class="stat-card"><div id="accuracy" class="value">-</div><div class="label">Accuracy</div></div>
+            <div class="stat-card"><div id="trial-progress" class="value">0/0</div><div class="label">Trial</div></div>
+        </div>
+
+        <div class="game-area">
+            <div id="stimulus-display" class="stimulus"></div>
+            <div id="feedback-text" class="feedback-text"></div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div id="instruction-modal" class="modal" style="display: flex;">
+        <div class="modal-content">
+            <h3 style="font-size: 1.5rem; font-weight: bold; color: var(--primary-color);">Flanker Task</h3>
+            <p style="margin-top: 1rem; color: var(--muted-text-color);">A set of arrows will appear. Your task is to identify the direction of the <strong>center arrow</strong>.</p>
+            <p style="margin-top: 1rem; color: var(--muted-text-color);">Use the <strong>Left and Right Arrow Keys</strong> to respond. Ignore the surrounding arrows.</p>
+            <p style="margin-top: 1rem; font-weight: bold;">Respond as quickly and accurately as possible.</p>
+            <button id="start-game-btn" class="btn" style="margin-top: 1.5rem;">Start Task</button>
+        </div>
+    </div>
+
+    <div id="final-results-modal" class="modal">
+        <div class="modal-content">
+            <h3 style="font-size: 1.5rem; font-weight: bold; color: var(--primary-color);">Task Complete!</h3>
+            <p style="margin-top: 1rem; color: var(--muted-text-color);">You've finished the task. Here is your summary:</p>
+            <div id="final-summary" style="margin-top: 1.5rem; text-align: left; color: var(--text-color); font-size: 1.1rem; display: grid; gap: 0.5rem; justify-content: center;"></div>
+            <button id="return-to-games-btn" class="btn" style="margin-top: 1.5rem;">Back to Games</button>
+        </div>
     </div>
 
 </div>
+
 <script>
-const TOTAL_ROUNDS = 10;
-let currentRound = 1;
-let score = 0;
-let events = [];
-let difficulty = 'medium';
-let arrowDir = 'right';
-let roundStart = null;
+document.addEventListener('DOMContentLoaded', () => {
+    // Game Parameters
+    const TOTAL_TRIALS = 96; // 3 conditions x 2 directions x 16 reps
+    const FIXATION_DURATION = 500; // ms
+    const STIMULUS_TIMEOUT = 1700; // ms, max time to respond
+    const FEEDBACK_DURATION = 800; // ms
+    const INTER_TRIAL_INTERVAL = 300; // ms
 
-function randomArrow() {
-    return Math.random() < 0.5 ? 'left' : 'right';
-}
+    // Game State
+    let gameState = 'instructions'; // instructions, running, finished
+    let trialList = [];
+    let currentTrialIndex = 0;
+    let events = [];
+    let results = [];
+    let gameStartTime = 0;
+    let responseListener = null;
+    let timeoutId = null;
+    let isSaving = false;
 
-function showArrow() {
-    arrowDir = randomArrow();
-    document.getElementById('arrow').textContent = arrowDir === 'left' ? '⬅️' : '➡️';
-    roundStart = Date.now();
-}
-
-function logEvent(type, data) {
-    events.push({
-        event_type: type,
-        round: currentRound,
-        score: score,
-        difficulty: difficulty,
-        arrow: arrowDir,
-        timestamp: Date.now(),
-        ...data
-    });
-}
-
-function updateUI() {
-    document.getElementById('round-num').textContent = currentRound;
-    document.getElementById('total-rounds').textContent = TOTAL_ROUNDS;
-    document.getElementById('total-rounds-2').textContent = TOTAL_ROUNDS;
-    document.getElementById('score').textContent = score;
-    document.getElementById('feedback').textContent = '';
-    showArrow();
-}
-
-document.querySelectorAll('.arrow-btn').forEach(btn => {
-    btn.onclick = function() {
-        const dir = btn.getAttribute('data-dir');
-        const rt = Date.now() - roundStart;
-        const correct = dir === arrowDir;
-        logEvent('response', {response: dir, correct: correct, reaction_time: rt});
-        if (correct) {
-            score += 1;
-            document.getElementById('feedback').textContent = `Correct! (+1)`;
-        } else {
-            document.getElementById('feedback').textContent = `Incorrect.`;
-        }
-        if (currentRound < TOTAL_ROUNDS) {
-            currentRound++;
-            setTimeout(() => {
-                updateUI();
-            }, 800);
-        } else {
-            document.getElementById('game-area').innerHTML = `<div class='font-bold text-lg'>Game Over! Final score: ${score}</div>`;
-            logEvent('end', {final_score: score});
-            // Mark that we're saving to backend to avoid duplicate saves
-            logEvent('backend_saved', {});
-            sendEventsToBackend();
-        }
+    // DOM Elements
+    const gameBody = document.querySelector('.game-body');
+    const backToGamesBtn = document.getElementById('back-to-games');
+    const returnToGamesBtn = document.getElementById('return-to-games-btn');
+    const startGameBtn = document.getElementById('start-game-btn');
+    const instructionModal = document.getElementById('instruction-modal');
+    const finalResultsModal = document.getElementById('final-results-modal');
+    const stimulusDisplay = document.getElementById('stimulus-display');
+    const feedbackText = document.getElementById('feedback-text');
+    const dashboard = {
+        flankerEffect: document.getElementById('flanker-effect'),
+        avgRt: document.getElementById('avg-rt'),
+        accuracy: document.getElementById('accuracy'),
+        trialProgress: document.getElementById('trial-progress'),
     };
-});
 
-document.getElementById('back-to-games').onclick = function() {
-    // If game is still active, end session first
-    if (currentRound <= TOTAL_ROUNDS) {
-        logEvent('manual_end', {final_score: score});
-        document.querySelectorAll('.arrow-btn').forEach(btn => btn.disabled = true);
-        document.getElementById('game-area').innerHTML = `<div class='font-bold text-lg text-red-600'>Session Ended! Final score: ${score}</div>`;
-        // Save data and then redirect
-        sendEventsToBackend().then(() => {
-            window.location.href = '/games/';
-        }).catch(() => {
-            // Even if save fails, still redirect
-            window.location.href = '/games/';
-        });
-    } else {
-        // Game is completed, ensure data is saved before redirecting
-        // Check if we need to save the completed game data
-        if (events.length > 0 && !events.some(e => e.event_type === 'backend_saved')) {
-            // Mark that we're saving to backend to avoid duplicate saves
-            logEvent('backend_saved', {});
-            sendEventsToBackend().then(() => {
-                window.location.href = '/games/';
-            }).catch(() => {
-                // Even if save fails, still redirect
-                window.location.href = '/games/';
-            });
-        } else {
-            // Data already saved or no data to save, safe to redirect
-            window.location.href = '/games/';
-        }
-    }
-};
+    const createTrials = () => {
+        const conditions = [];
+        const trialTypes = ['congruent', 'incongruent', 'neutral'];
+        const directions = ['left', 'right'];
+        const trialsPerCondition = TOTAL_TRIALS / trialTypes.length / directions.length;
 
-function sendEventsToBackend() {
-    return fetch('/games/save_game_result/', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': getCookie('csrftoken')
-        },
-        body: JSON.stringify({
-            game_type: 'arrows_game',
-            score: score,
-            duration: TOTAL_ROUNDS * 10,
-            decisions: events.filter(e => e.event_type === 'response'),
-            reaction_times: events.filter(e => e.event_type === 'response').map(e => e.reaction_time),
-            raw_data: {events: events}
-        })
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.success) {
-            console.log('Session saved successfully');
-        } else {
-            console.error('Error saving session: ' + data.error);
-        }
-        return data;
-    });
-}
-
-function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
+        for (const type of trialTypes) {
+            for (const dir of directions) {
+                for (let i = 0; i < trialsPerCondition; i++) {
+                    conditions.push({ trialType: type, direction: dir });
+                }
             }
         }
-    }
-    return cookieValue;
-}
+        return conditions.sort(() => Math.random() - 0.5);
+    };
 
-updateUI();
+    const startGame = () => {
+        instructionModal.style.display = 'none';
+        trialList = createTrials();
+        dashboard.trialProgress.textContent = `0/${TOTAL_TRIALS}`;
+        gameState = 'running';
+        gameStartTime = performance.now();
+        logEvent('game_start');
+        runTrial();
+    };
+
+    const runTrial = () => {
+        if (currentTrialIndex >= TOTAL_TRIALS) {
+            endGame();
+            return;
+        }
+        stimulusDisplay.textContent = '+';
+        feedbackText.textContent = '';
+        updateDashboard();
+
+        setTimeout(() => {
+            if (gameState !== 'running') return;
+            showStimulus();
+        }, FIXATION_DURATION);
+    };
+
+    const showStimulus = () => {
+        const trial = trialList[currentTrialIndex];
+        const targetArrow = trial.direction === 'left' ? '←' : '→';
+        let stimulus;
+
+        if (trial.trialType === 'congruent') {
+            stimulus = `${targetArrow}${targetArrow}${targetArrow}${targetArrow}${targetArrow}`;
+        } else if (trial.trialType === 'incongruent') {
+            const flankerArrow = trial.direction === 'left' ? '→' : '←';
+            stimulus = `${flankerArrow}${flankerArrow}${targetArrow}${flankerArrow}${flankerArrow}`;
+        } else { // neutral
+            stimulus = `——${targetArrow}——`;
+        }
+
+        stimulusDisplay.textContent = stimulus;
+        const stimulusTime = performance.now();
+        logEvent('stimulus_onset', { trial_index: currentTrialIndex, trial_type: trial.trialType, target_direction: trial.direction });
+
+        responseListener = (e) => handleKeyPress(e, trial, stimulusTime);
+        document.addEventListener('keydown', responseListener);
+
+        timeoutId = setTimeout(() => {
+            handleKeyPress({ key: 'timeout' }, trial, stimulusTime);
+        }, STIMULUS_TIMEOUT);
+    };
+
+    const handleKeyPress = (e, trial, stimulusTime) => {
+        if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'timeout') return;
+        
+        document.removeEventListener('keydown', responseListener);
+        clearTimeout(timeoutId);
+
+        const rt = e.key === 'timeout' ? null : performance.now() - stimulusTime;
+        const responseKey = e.key === 'ArrowLeft' ? 'left' : (e.key === 'ArrowRight' ? 'right' : 'timeout');
+        const correct = responseKey === trial.direction;
+
+        results.push({ ...trial, rt, correct, response: responseKey });
+        logEvent('response', { trial_index: currentTrialIndex, response: responseKey, rt, correct });
+        showFeedback(correct, e.key === 'timeout');
+    };
+
+    const showFeedback = (correct, isTimeout) => {
+        stimulusDisplay.textContent = '';
+        if (isTimeout) {
+            feedbackText.textContent = 'Too Slow';
+            feedbackText.style.color = 'var(--incorrect-color)';
+        } else {
+            feedbackText.textContent = correct ? 'Correct' : 'Incorrect';
+            feedbackText.style.color = correct ? 'var(--correct-color)' : 'var(--incorrect-color)';
+        }
+
+        setTimeout(() => {
+            currentTrialIndex++;
+            if (gameState === 'running') runTrial();
+        }, FEEDBACK_DURATION);
+    };
+
+    const updateDashboard = () => {
+        dashboard.trialProgress.textContent = `${currentTrialIndex}/${TOTAL_TRIALS}`;
+        if (results.length === 0) return;
+
+        const validTrials = results.filter(r => r.rt !== null);
+        const correctTrials = validTrials.filter(r => r.correct);
+        const accuracy = results.length > 0 ? (results.filter(r => r.correct).length / results.length) * 100 : 0;
+        dashboard.accuracy.textContent = `${accuracy.toFixed(0)}%`;
+
+        if (correctTrials.length > 0) {
+            const totalRt = correctTrials.reduce((sum, r) => sum + r.rt, 0);
+            dashboard.avgRt.textContent = `${(totalRt / correctTrials.length).toFixed(0)}`;
+        } else {
+            dashboard.avgRt.textContent = '-';
+        }
+
+        const flankerEffect = calculateFlankerEffect();
+        dashboard.flankerEffect.textContent = flankerEffect !== null ? `${flankerEffect.toFixed(0)}` : '-';
+    };
+
+    const calculateFlankerEffect = () => {
+        const meanRt = (type) => {
+            const trials = results.filter(r => r.trialType === type && r.correct && r.rt !== null);
+            if (trials.length < 3) return null; // Need enough data points
+            return trials.reduce((sum, r) => sum + r.rt, 0) / trials.length;
+        };
+        const congruentRt = meanRt('congruent');
+        const incongruentRt = meanRt('incongruent');
+        return (congruentRt !== null && incongruentRt !== null) ? incongruentRt - congruentRt : null;
+    };
+
+    const endGame = () => {
+        gameState = 'finished';
+        logEvent('game_end');
+        updateDashboard(); // Final update
+
+        const finalFlanker = calculateFlankerEffect();
+        const finalAccuracy = (results.filter(r => r.correct).length / results.length * 100).toFixed(1);
+        const finalAvgRt = (results.filter(r => r.correct && r.rt).reduce((sum, r) => sum + r.rt, 0) / results.filter(r => r.correct && r.rt).length).toFixed(0);
+
+        document.getElementById('final-summary').innerHTML = `
+            <div><strong>Flanker Effect:</strong> ${finalFlanker !== null ? `${finalFlanker.toFixed(0)} ms` : 'N/A'}</div>
+            <div><strong>Overall Accuracy:</strong> ${finalAccuracy}%</div>
+            <div><strong>Average Correct RT:</strong> ${finalAvgRt} ms</div>
+        `;
+        finalResultsModal.style.display = 'flex';
+        sendEventsToBackend('completed');
+    };
+
+    const logEvent = (type, data = {}) => {
+        events.push({ event_type: type, timestamp: performance.now() - gameStartTime, ...data });
+    };
+
+    const sendEventsToBackend = (completionStatus) => {
+        if (isSaving) return Promise.resolve();
+        isSaving = true;
+        backToGamesBtn.textContent = 'Saving...';
+        backToGamesBtn.style.pointerEvents = 'none';
+
+        const csrfToken = gameBody.dataset.csrfToken;
+        const url = '/games/save-result/';
+        const score = results.filter(r => r.correct).length;
+        const finalResults = { flanker_effect: calculateFlankerEffect(), ...results };
+
+        return fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+            body: JSON.stringify({
+                game_type: 'arrows_game',
+                score: score,
+                duration: performance.now() - gameStartTime,
+                raw_data: { events, results: finalResults },
+                completion_status: completionStatus
+            })
+        })
+        .then(response => response.json())
+        .catch(error => console.error('Error saving game data:', error))
+        .finally(() => {
+            isSaving = false;
+            backToGamesBtn.textContent = 'Back to Games';
+            backToGamesBtn.style.pointerEvents = 'auto';
+        });
+    };
+
+    const handleExit = (e) => {
+        e.preventDefault();
+        if (isSaving) return;
+
+        const url = gameBody.dataset.gameListUrl;
+        if (gameState === 'running') {
+            gameState = 'abandoned';
+            logEvent('game_abandoned');
+            sendEventsToBackend('abandoned').then(() => { window.location.href = url; });
+        } else {
+            window.location.href = url;
+        }
+    };
+
+    // Event Listeners
+    startGameBtn.addEventListener('click', startGame);
+    backToGamesBtn.addEventListener('click', handleExit);
+    returnToGamesBtn.addEventListener('click', handleExit);
+});
 </script>
 {% endblock %}

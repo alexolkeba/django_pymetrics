@@ -33,8 +33,8 @@ class GameResult(models.Model):
     # Expanded game types to match Pymetrics 16-game suite
     GAME_TYPES = [
         # Core Neuroscience Games (12 games)
-        ('balloon_risk', 'Balloon Risk Game'),
-        ('memory_cards', 'Memory Cards Game'),
+        ('balloon_risk', 'The Inflation Gambit', 'A high-stakes game of risk and reward. Pump a balloon to increase your potential earnings, but cash out before it bursts or lose everything. How far are you willing to go?'),
+        ('memory_cards', 'Cognitive Atlas Challenge'),
         ('reaction_timer', 'Reaction Timer Game'),
         ('sorting_task', 'Sorting Task Game'),
         ('pattern_completion', 'Pattern Completion Game'),
@@ -93,6 +93,19 @@ class GameResult(models.Model):
     
     completed_at = models.DateTimeField(auto_now_add=True)
     
+    # Game completion tracking
+    COMPLETION_STATUS_CHOICES = [
+        ('completed', 'Completed'),
+        ('incomplete', 'Incomplete'),
+        ('abandoned', 'Abandoned'),
+    ]
+    completion_status = models.CharField(
+        max_length=20, 
+        choices=COMPLETION_STATUS_CHOICES, 
+        default='incomplete',
+        help_text="Whether the game was fully completed or abandoned early"
+    )
+    
     # Data quality and validation
     data_completeness = models.FloatField(default=0.0, help_text="Percentage of expected data collected")
     data_quality_score = models.FloatField(default=0.0, help_text="Quality assessment of collected data")
@@ -107,7 +120,7 @@ class GameResult(models.Model):
         game_names = {
             # Core Neuroscience Games
             'balloon_risk': 'Balloon Risk Game',
-            'memory_cards': 'Memory Cards Game',
+            'memory_cards': 'Cognitive Atlas Challenge',
             'reaction_timer': 'Reaction Timer Game',
             'sorting_task': 'Sorting Task Game',
             'pattern_completion': 'Pattern Completion Game',

@@ -1,180 +1,624 @@
 {% extends 'base.html' %}
+{% load static %}
 {% block content %}
-<div class="max-w-lg mx-auto mt-4">
-    <button id="back-to-games" class="inline-block mb-4 px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300">← Back to Games</button>
-</div>
-<div class="game-container max-w-lg mx-auto mt-8 p-6 bg-white rounded shadow">
-    <h2 class="text-2xl font-bold mb-2">Attention Network Game</h2>
-    <p class="mb-4">Respond to cues and targets as quickly and accurately as possible. Try to maximize your score over <span id="total-rounds">12</span> trials.</p>
-    <div id="game-area">
-        <div id="round-info" class="mb-2 font-semibold">Trial <span id="round-num">1</span> of <span id="total-rounds-2">12</span></div>
-        <div class="mb-2">Current score: <span id="score">0</span></div>
-        <div id="cue" class="my-4 text-xl"></div>
-        <div id="target" class="my-4 text-3xl"></div>
-        <div class="flex space-x-2 mb-2">
-            <button class="attn-btn bg-blue-500 text-white px-4 py-2 rounded" data-choice="left">Left</button>
-            <button class="attn-btn bg-green-500 text-white px-4 py-2 rounded" data-choice="right">Right</button>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+<style>
+    :root {
+        --primary-color: #38BDF8; /* Light Blue for focus */
+        --secondary-color: #334155;
+        --background-color: #0F172A; /* Dark blue */
+        --surface-color: #1E293B;
+        --text-color: #F1F5F9;
+        --muted-text-color: #94A3B8;
+        --border-color: #334155;
+        --correct-color: #4ADE80;
+        --incorrect-color: #F87171;
+    }
+    .game-body { background-color: var(--background-color); color: var(--text-color); font-family: 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 1rem; }
+    .game-container { background-color: var(--surface-color); border-radius: 12px; border: 1px solid var(--border-color); box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3); width: 100%; max-width: 900px; overflow: hidden; }
+    .game-header { background-color: rgba(0,0,0,0.2); padding: 1.5rem; text-align: center; border-bottom: 1px solid var(--border-color); }
+    .game-header h2 { font-size: 1.75rem; font-weight: bold; margin: 0; }
+    .dashboard { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; padding: 1.5rem; border-bottom: 1px solid var(--border-color); }
+    .stat-card { background-color: var(--secondary-color); padding: 1rem; border-radius: 8px; text-align: center; }
+    .stat-card .value { font-size: 1.5rem; font-weight: bold; color: var(--primary-color); }
+    .stat-card .label { font-size: 0.8rem; color: var(--muted-text-color); text-transform: uppercase; }
+    .game-area { padding: 2rem; min-height: 400px; display: flex; flex-direction: column; justify-content: center; align-items: center; position: relative; font-family: 'Courier New', Courier, monospace; }
+    .stimulus { font-size: 5rem; font-weight: bold; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); }
+    .feedback-text { position: absolute; bottom: 20px; font-size: 1.5rem; font-weight: bold; }
+    .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); justify-content: center; align-items: center; }
+    .modal-content { background-color: var(--surface-color); padding: 2rem; border-radius: 12px; border: 1px solid var(--border-color); max-width: 550px; width: 90%; text-align: center; box-shadow: 0 5px 15px rgba(0,0,0,0.5); animation: modal-pop 0.3s ease-out; }
+    @keyframes modal-pop { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    .btn { padding: 0.75rem 1.5rem; border: none; border-radius: 8px; font-size: 1rem; font-weight: bold; cursor: pointer; transition: background-color 0.2s; color: var(--background-color); background-color: var(--primary-color); }
+    .btn:hover { background-color: #7DD3FC; }
+    #back-to-games { position: absolute; top: 20px; left: 20px; background-color: rgba(0, 0, 0, 0.3); color: var(--text-color); padding: 0.5rem 1rem; border-radius: 8px; text-decoration: none; font-weight: bold; z-index: 10; }
+</style>
+
+<div class="game-body" data-game-list-url="{% url 'games:game_list' %}" data-csrf-token="{{ csrf_token }}">
+    <a href="#" id="back-to-games"><i class="fas fa-arrow-left"></i> Back to Games</a>
+
+    <div class="game-container">
+        <div class="game-header">
+            <h2>Attention Control Challenge</h2>
         </div>
-        <div id="feedback" class="mt-3 text-blue-600 font-semibold"></div>
+
+        <div class="dashboard">
+            <div class="stat-card"><div id="alerting-score" class="value">-</div><div class="label">Alerting (ms)</div></div>
+            <div class="stat-card"><div id="orienting-score" class="value">-</div><div class="label">Orienting (ms)</div></div>
+            <div class="stat-card"><div id="executive-score" class="value">-</div><div class="label">Executive (ms)</div></div>
+            <div class="stat-card"><div id="accuracy-display" class="value">-</div><div class="label">Accuracy</div></div>
+            <div class="stat-card"><div id="trial-progress" class="value">0/0</div><div class="label">Trial</div></div>
+        </div>
+
+        <div class="game-area">
+            <div id="fixation-cross" class="stimulus" style="display: none;">+</div>
+            <div id="cue-stimulus" class="stimulus" style="display: none;"></div>
+            <div id="target-stimulus" class="stimulus" style="display: none;"></div>
+            <div id="feedback-text" class="feedback-text"></div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div id="instruction-modal" class="modal" style="display: flex;">
+        <div class="modal-content">
+            <h3 style="font-size: 1.5rem; font-weight: bold; color: var(--primary-color);">Attention Control Challenge</h3>
+            <p style="margin-top: 1rem; color: var(--muted-text-color);">Focus on the cross that appears in the center. A cue (*) may appear to signal where the target will be.</p>
+            <p style="margin-top: 1rem; color: var(--muted-text-color);">When a row of arrows appears, identify the direction of the <strong>middle arrow</strong>. Use the <strong>Left and Right Arrow Keys</strong> to respond.</p>
+            <p style="margin-top: 1rem; font-weight: bold;">Be as fast and accurate as possible.</p>
+            <button id="start-game-btn" class="btn" style="margin-top: 1.5rem;">Start Challenge</button>
+        </div>
+    </div>
+
+    <div id="final-results-modal" class="modal">
+        <div class="modal-content">
+            <h3 style="font-size: 1.5rem; font-weight: bold; color: var(--primary-color);">Challenge Complete!</h3>
+            <p style="margin-top: 1rem; color: var(--muted-text-color);">You've successfully completed the assessment. Here are your attention network scores:</p>
+            <div id="final-summary" style="margin-top: 1.5rem; text-align: left; color: var(--text-color); font-size: 1.1rem; display: grid; gap: 0.5rem; justify-content: center;"></div>
+            <button id="return-to-games-btn" class="btn" style="margin-top: 1.5rem;">Back to Games</button>
+        </div>
     </div>
 
 </div>
-<script>
-const TOTAL_ROUNDS = 12;
-let currentRound = 1;
-let score = 0;
-let events = [];
-let difficulty = 'medium';
-let cueType = '';
-let targetDir = '';
-let trialStart = null;
 
-function randomCue() {
-    // Types: 'center', 'double', 'spatial-left', 'spatial-right', 'none'
-    const cues = ['center', 'double', 'spatial-left', 'spatial-right', 'none'];
-    return cues[Math.floor(Math.random() * cues.length)];
-}
-function randomTarget() {
-    return Math.random() < 0.5 ? 'left' : 'right';
-}
-function showTrial() {
-    cueType = randomCue();
-    targetDir = randomTarget();
-    let cueText = '';
-    if (cueType === 'center') cueText = '●';
-    else if (cueType === 'double') cueText = '●   ●';
-    else if (cueType === 'spatial-left') cueText = '●      ';
-    else if (cueType === 'spatial-right') cueText = '      ●';
-    else cueText = '';
-    document.getElementById('cue').textContent = cueText;
-    document.getElementById('target').textContent = '';
-    setTimeout(() => {
-        document.getElementById('target').textContent = targetDir === 'left' ? '←' : '→';
-        trialStart = Date.now();
-    }, 700); // Cue duration
-}
-function logEvent(type, data) {
-    events.push({
-        event_type: type,
-        trial: currentRound,
-        cue: cueType,
-        target: targetDir,
-        score: score,
-        difficulty: difficulty,
-        timestamp: Date.now(),
-        ...data
-    });
-}
-function updateUI() {
-    document.getElementById('round-num').textContent = currentRound;
-    document.getElementById('total-rounds').textContent = TOTAL_ROUNDS;
-    document.getElementById('total-rounds-2').textContent = TOTAL_ROUNDS;
-    document.getElementById('score').textContent = score;
-    document.getElementById('feedback').textContent = '';
-    showTrial();
-}
-document.querySelectorAll('.attn-btn').forEach(btn => {
-    btn.onclick = function() {
-        if (!trialStart) return;
-        const choice = btn.getAttribute('data-choice');
-        const rt = Date.now() - trialStart;
-        const correct = choice === targetDir;
-        logEvent('response', {choice: choice, correct: correct, reaction_time: rt});
-        if (correct) {
-            score += 1;
-            document.getElementById('feedback').textContent = `Correct! (+1)`;
-        } else {
-            document.getElementById('feedback').textContent = `Incorrect.`;
-        }
-        trialStart = null;
-        if (currentRound < TOTAL_ROUNDS) {
-            currentRound++;
-            setTimeout(() => {
-                updateUI();
-            }, 900);
-        } else {
-            document.getElementById('game-area').innerHTML = `<div class='font-bold text-lg'>Game Over! Final score: ${score}</div>`;
-            logEvent('end', {final_score: score});
-            // Mark that we're saving to backend to avoid duplicate saves
-            logEvent('backend_saved', {});
-            sendEventsToBackend();
-            currentRound = TOTAL_ROUNDS + 1; // Mark game as completed
-        }
-    };
-});
-document.getElementById('back-to-games').onclick = function() {
-    // Disable the button to prevent double clicks
-    document.getElementById('back-to-games').disabled = true;
-    // If game is still active, end session first
-    if (currentRound <= TOTAL_ROUNDS) {
-        logEvent('manual_end', {final_score: score});
-        document.querySelectorAll('.attn-btn').forEach(btn => btn.disabled = true);
-        document.getElementById('game-area').innerHTML = `<div class='font-bold text-lg text-red-600'>Session Ended! Final score: ${score}</div>`;
-        // Save data and then redirect
-        sendEventsToBackend().then(() => {
-            window.location.href = '/games/';
-        }).catch(() => {
-            // Even if save fails, still redirect
-            window.location.href = '/games/';
-        });
-    } else {
-        // Game is completed, ensure data is saved before redirecting
-        // Check if we need to save the completed game data
-        if (events.length > 0 && !events.some(e => e.event_type === 'backend_saved')) {
-            // Mark that we're saving to backend to avoid duplicate saves
-            logEvent('backend_saved', {});
-            sendEventsToBackend().then(() => {
-                window.location.href = '/games/';
-            }).catch(() => {
-                // Even if save fails, still redirect
-                window.location.href = '/games/';
-            });
-        } else {
-            // Data already saved or no data to save, safe to redirect
-            window.location.href = '/games/';
-        }
-    }
-};
-function sendEventsToBackend() {
-    return fetch('/games/save_game_result/', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': getCookie('csrftoken')
-        },
-        body: JSON.stringify({
-            game_type: 'attention_network',
-            score: score,
-            duration: TOTAL_ROUNDS * 5, // Placeholder
-            decisions: events.filter(e => e.event_type === 'response'),
-            reaction_times: events.filter(e => e.reaction_time !== undefined).map(e => e.reaction_time),
-            raw_data: {events: events}
-        })
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.success) {
-            console.log('Session saved successfully');
-        } else {
-            console.error('Error saving session: ' + data.error);
-        }
-        return data;
-    });
-}
-function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
+<script>
+// Game Parameters
+const TOTAL_TRIALS = 96;
+const FIXATION_DURATION = () => 400 + Math.random() * 1200; // Variable fixation
+const CUE_DURATION = 100;
+const POST_CUE_DELAY = 50;
+const RESPONSE_TIMEOUT = 1700;
+
+// State
+let trialList = [];
+let currentTrialIndex = 0;
+let events = [];
+let results = [];
+let gameState = 'instructions'; // instructions, running, finished
+let trialTimeoutId = null;
+
+// UI Elements
+const avgRtEl = document.getElementById('avg-rt');
+const accuracyEl = document.getElementById('accuracy');
+const trialCountEl = document.getElementById('trial-count');
+const fixationCrossEl = document.getElementById('fixation-cross');
+const cueStimulusEl = document.getElementById('cue-stimulus');
+const targetStimulusEl = document.getElementById('target-stimulus');
+const feedbackIndicatorEl = document.getElementById('feedback-text');
+const instructionModal = document.getElementById('instruction-modal');
+const finalResultsModal = document.getElementById('final-results-modal');
+
+function createTrials() {
+    const conditions = [];
+    const cueTypes = ['no_cue', 'center_cue', 'double_cue', 'spatial_cue'];
+    const flankerTypes = ['congruent', 'incongruent'];
+    const targetDirections = ['left', 'right'];
+    const targetPositions = ['up', 'down']; // For spatial cues
+
+    for (const cue of cueTypes) {
+        for (const flanker of flankerTypes) {
+            for (const direction of targetDirections) {
+                // For spatial cues, we need to match position
+                if (cue === 'spatial_cue') {
+                    for (const position of targetPositions) {
+                        conditions.push({ cueType: cue, flankerType: flanker, targetDirection: direction, targetPosition: position });
+                    }
+                } else {
+                    conditions.push({ cueType: cue, flankerType: flanker, targetDirection: direction, targetPosition: 'center' });
+                }
             }
         }
     }
+    // Create a balanced list of 96 trials (2 full blocks of 48)
+    return shuffle([...conditions, ...conditions]);
+}
+
+function shuffle(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
+}
+
+function runTrial() {
+    if (currentTrialIndex >= TOTAL_TRIALS) {
+        endGame();
+        return;
+    }
+    const trial = trialList[currentTrialIndex];
+    clearStimuli();
+    updateDashboard();
+
+    fixationCrossEl.style.display = 'block';
+    
+    setTimeout(() => {
+        fixationCrossEl.style.display = 'none';
+        showCue(trial);
+        setTimeout(() => {
+            showTarget(trial);
+        }, CUE_DURATION + POST_CUE_DELAY);
+    }, FIXATION_DURATION());
+}
+
+function showCue(trial) {
+    let cueHtml = '';
+    if (trial.cueType === 'center_cue') {
+        cueStimulusEl.innerHTML = '*';
+    } else if (trial.cueType === 'double_cue') {
+        cueStimulusEl.innerHTML = '<span style="position:absolute; top:-40px">*</span><span style="position:absolute; top:40px">*</span>';
+    } else if (trial.cueType === 'spatial_cue') {
+        cueStimulusEl.style.top = trial.targetPosition === 'up' ? '-40px' : '40px';
+        cueStimulusEl.innerHTML = '*';
+    }
+    // No cue: do nothing
+}
+
+function showTarget(trial) {
+    clearStimuli();
+    const targetArrow = trial.targetDirection === 'left' ? '&#x2190;' : '&#x2192;';
+    let flankerArrows = '';
+    if (trial.flankerType === 'congruent') {
+        flankerArrows = trial.targetDirection === 'left' ? '&#x2190;&#x2190;' : '&#x2192;&#x2192;';
+    } else {
+        flankerArrows = trial.targetDirection === 'left' ? '&#x2192;&#x2192;' : '&#x2190;&#x2190;';
+    }
+    targetStimulusEl.innerHTML = `${flankerArrows} ${targetArrow} ${flankerArrows}`;
+    targetStimulusEl.style.top = trial.targetPosition === 'up' ? '-40px' : (trial.targetPosition === 'down' ? '40px' : '0');
+    
+    const trialStartTime = Date.now();
+    logEvent('target_onset', { trial_index: currentTrialIndex, ...trial });
+
+    trialTimeoutId = setTimeout(() => handleResponse(null, trialStartTime, trial), RESPONSE_TIMEOUT);
+}
+
+function handleResponse(e, trialStartTime, trial) {
+    clearTimeout(trialTimeoutId);
+    window.removeEventListener('keydown', boundKeyDownHandler);
+
+    const rt = e ? Date.now() - trialStartTime : null;
+    const choice = e ? (e.key === 'ArrowLeft' ? 'left' : 'right') : 'timeout';
+    const correct = rt !== null && choice === trial.targetDirection;
+
+    results.push({ rt, correct, ...trial });
+    logEvent('response', { choice, rt, correct });
+
+    feedbackIndicatorEl.textContent = correct ? 'Correct' : (rt === null ? 'Too Slow' : 'Incorrect');
+    feedbackIndicatorEl.className = correct ? 'correct' : 'incorrect';
+
+    currentTrialIndex++;
+    setTimeout(runTrial, 1000);
+}
+
+let boundKeyDownHandler;
+function listenForResponse(trialStartTime, trial) {
+    boundKeyDownHandler = (e) => {
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+            handleResponse(e, trialStartTime, trial);
+        }
+    };
+    window.addEventListener('keydown', boundKeyDownHandler);
+}
+
+function clearStimuli() {
+    fixationCrossEl.style.display = 'none';
+    cueStimulusEl.innerHTML = '';
+    targetStimulusEl.innerHTML = '';
+    feedbackIndicatorEl.textContent = '';
+    cueStimulusEl.style.top = '0';
+    targetStimulusEl.style.top = '0';
+}
+
+function updateDashboard() {
+    trialCountEl.textContent = `${currentTrialIndex}/${TOTAL_TRIALS}`;
+    const correctTrials = results.filter(r => r.correct);
+    if (correctTrials.length > 0) {
+        const totalRt = correctTrials.reduce((sum, r) => sum + r.rt, 0);
+        avgRtEl.textContent = `${Math.round(totalRt / correctTrials.length)} ms`;
+        accuracyEl.textContent = `${Math.round((correctTrials.length / results.length) * 100)}%`;
+    } else {
+        avgRtEl.textContent = '- ms';
+        accuracyEl.textContent = '-%';
+    }
+}
+
+function calculateNetworkScores() {
+    const getMeanRt = (filterFn) => {
+        const trials = results.filter(r => r.correct && filterFn(r));
+        if (trials.length === 0) return 0;
+        return trials.reduce((sum, t) => sum + t.rt, 0) / trials.length;
+    };
+
+    const rtNoCue = getMeanRt(t => t.cueType === 'no_cue');
+    const rtDoubleCue = getMeanRt(t => t.cueType === 'double_cue');
+    const rtCenterCue = getMeanRt(t => t.cueType === 'center_cue');
+    const rtSpatialCue = getMeanRt(t => t.cueType === 'spatial_cue');
+    const rtCongruent = getMeanRt(t => t.flankerType === 'congruent');
+    const rtIncongruent = getMeanRt(t => t.flankerType === 'incongruent');
+
+    const alerting = Math.round(rtNoCue - rtDoubleCue);
+    const orienting = Math.round(rtCenterCue - rtSpatialCue);
+    const executive = Math.round(rtIncongruent - rtCongruent);
+
+    return { alerting, orienting, executive };
+}
+
+function endGame() {
+    gameState = 'finished';
+    logEvent('game_end', {});
+    const scores = calculateNetworkScores();
+    logEvent('network_scores', scores);
+
+    finalResultsModal.style.display = 'flex';
+    document.getElementById('final-stats').textContent = `Avg. Reaction: ${avgRtEl.textContent} | Accuracy: ${accuracyEl.textContent}`;
+    document.getElementById('final-summary').innerHTML = 
+        `<div><strong>Alerting:</strong> ${scores.alerting} ms</div>
+         <div><strong>Orienting:</strong> ${scores.orienting} ms</div>
+         <div><strong>Executive Control:</strong> ${scores.executive} ms</div>`;
+
+    sendEventsToBackend();
+}
+
+function startGame() {
+    instructionModal.style.display = 'none';
+    trialList = createTrials();
+    gameState = 'running';
+    logEvent('game_start', {});
+    runTrial();
+}
+
+function logEvent(type, data) {
+    events.push({ event_type: type, timestamp: new Date().toISOString(), ...data });
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';').map(c => c.trim());
+        const cookie = cookies.find(c => c.startsWith(name + '='));
+        if (cookie) cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+    }
     return cookieValue;
 }
-updateUI();
+
+function sendEventsToBackend() {
+    const completionStatus = gameState === 'finished' ? 'completed' : 'abandoned';
+    const totalDuration = events.length > 1 ? new Date(events[events.length - 1].timestamp) - new Date(events[0].timestamp) : 0;
+
+    fetch('/games/save-result/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+        body: JSON.stringify({
+            game_type: 'attention_network',
+            score: results.filter(r => r.correct).length, // Score is number of correct trials
+            duration: totalDuration,
+            raw_data: { events, results },
+            completion_status: completionStatus
+        })
+    }).then(res => res.json()).then(data => {
+        if (!data.success) console.error('Error saving session:', data.error);
+    });
+}
+
+// Event Listeners
+document.getElementById('start-game-btn').addEventListener('click', startGame);
+document.getElementById('back-to-games').addEventListener('click', function() {
+    if (gameState === 'running') {
+        logEvent('game_abandoned', {});
+        sendEventsToBackend().finally(() => window.location.href = '/games/');
+    } else {
+        window.location.href = '/games/';
+    }
+    this.disabled = true;
+});
+
+window.addEventListener('keydown', (e) => {
+    if (gameState === 'running' && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+        // The actual response handler is added/removed per trial
+        // This is a fallback listener that can be used if needed
+    }
+});
+
+// Add a global keydown listener that will be managed by the trial runner
+document.addEventListener('DOMContentLoaded', () => {
+    // --- CONFIG & CONSTANTS ---
+    const TOTAL_TRIALS = 96; // 24 per cue type
+    const CUE_DURATION = 100; // ms
+    const POST_CUE_DELAY = 50; // ms
+    const RESPONSE_TIMEOUT = 1700; // ms
+    const FEEDBACK_DURATION = 1000; // ms
+    const FIXATION_DURATION = () => Math.floor(Math.random() * 1200) + 400; // 400-1600ms
+
+    // --- STATE ---
+    let trialList = [];
+    let events = [];
+    let results = [];
+    let currentTrialIndex = 0;
+    let gameState = 'instructions'; // instructions, running, finished
+    let gameStartTime = null;
+    let isSaving = false;
+    let responseHandler = null; // To hold the current trial's response listener
+
+    // --- DOM ELEMENTS ---
+    const gameBody = document.querySelector('.game-body');
+    const csrfToken = gameBody.dataset.csrfToken;
+    const gameListUrl = gameBody.dataset.gameListUrl;
+
+    const alertingScoreEl = document.getElementById('alerting-score');
+    const orientingScoreEl = document.getElementById('orienting-score');
+    const executiveScoreEl = document.getElementById('executive-score');
+    const accuracyDisplayEl = document.getElementById('accuracy-display');
+    const trialProgressEl = document.getElementById('trial-progress');
+
+    const fixationCrossEl = document.getElementById('fixation-cross');
+    const cueStimulusEl = document.getElementById('cue-stimulus');
+    const targetStimulusEl = document.getElementById('target-stimulus');
+    const feedbackTextEl = document.getElementById('feedback-text');
+
+    const instructionModal = document.getElementById('instruction-modal');
+    const finalResultsModal = document.getElementById('final-results-modal');
+    const startGameBtn = document.getElementById('start-game-btn');
+    const backToGamesBtn = document.getElementById('back-to-games');
+    const returnToGamesBtn = document.getElementById('return-to-games-btn');
+
+    // --- CORE FUNCTIONS ---
+    const logEvent = (type, data = {}) => {
+        const timestamp = performance.now() - gameStartTime;
+        events.push({ event_type: type, timestamp_ms: Math.round(timestamp), ...data });
+    };
+
+    const createTrials = () => {
+        const conditions = [];
+        const cueTypes = ['no_cue', 'center_cue', 'double_cue', 'spatial_cue'];
+        const flankerTypes = ['congruent', 'incongruent', 'neutral'];
+        
+        // Create a balanced set of trials
+        for (let i = 0; i < TOTAL_TRIALS; i++) {
+            const cueType = cueTypes[Math.floor(i / (TOTAL_TRIALS / cueTypes.length))];
+            const flankerType = flankerTypes[i % flankerTypes.length];
+            const targetDirection = Math.random() < 0.5 ? 'left' : 'right';
+            const targetPosition = (cueType === 'spatial_cue' && Math.random() < 0.5) ? (targetDirection === 'left' ? 'left' : 'right') : 'center';
+
+            conditions.push({ cueType, flankerType, targetDirection, targetPosition });
+        }
+        return shuffle(conditions);
+    };
+
+    const shuffle = (array) => {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
+    };
+
+    const startGame = () => {
+        gameStartTime = performance.now();
+        gameState = 'running';
+        trialList = createTrials();
+        trialProgressEl.textContent = `0/${TOTAL_TRIALS}`;
+        instructionModal.style.display = 'none';
+        logEvent('game_start');
+        runTrial();
+    };
+
+    const runTrial = () => {
+        if (currentTrialIndex >= TOTAL_TRIALS) {
+            endGame();
+            return;
+        }
+
+        clearStimuli();
+        const trial = trialList[currentTrialIndex];
+        logEvent('trial_start', { trial_index: currentTrialIndex, details: trial });
+
+        fixationCrossEl.style.display = 'block';
+        setTimeout(() => {
+            fixationCrossEl.style.display = 'none';
+            showCue(trial);
+        }, FIXATION_DURATION());
+    };
+
+    const showCue = (trial) => {
+        if (trial.cueType !== 'no_cue') {
+            cueStimulusEl.textContent = '*';
+            // For this version, all cues appear at the center for simplicity.
+            // A more complex version could place spatial cues up/down.
+            cueStimulusEl.style.display = 'block';
+        }
+        logEvent('cue_onset', { cue_type: trial.cueType });
+
+        setTimeout(() => {
+            if (trial.cueType !== 'no_cue') cueStimulusEl.style.display = 'none';
+            setTimeout(() => showTarget(trial), POST_CUE_DELAY);
+        }, CUE_DURATION);
+    };
+
+    const showTarget = (trial) => {
+        const direction = trial.targetDirection === 'left' ? '←' : '→';
+        let flankers;
+        if (trial.flankerType === 'congruent') {
+            flankers = `${direction.repeat(2)}${direction}${direction.repeat(2)}`;
+        } else if (trial.flankerType === 'incongruent') {
+            const opposite = direction === '←' ? '→' : '←';
+            flankers = `${opposite.repeat(2)}${direction}${opposite.repeat(2)}`;
+        } else { // neutral
+            flankers = `— — ${direction} — —`;
+        }
+        targetStimulusEl.textContent = flankers;
+        targetStimulusEl.style.display = 'block';
+        const trialStartTime = performance.now();
+        logEvent('target_onset', { flanker_type: trial.flankerType });
+        listenForResponse(trialStartTime, trial);
+    };
+
+    const listenForResponse = (trialStartTime, trial) => {
+        const timeoutId = setTimeout(() => {
+            window.removeEventListener('keydown', responseHandler);
+            handleResponse(null, trialStartTime, trial);
+        }, RESPONSE_TIMEOUT);
+
+        responseHandler = (e) => {
+            if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                window.removeEventListener('keydown', responseHandler);
+                clearTimeout(timeoutId);
+                handleResponse(e, trialStartTime, trial);
+            }
+        };
+        window.addEventListener('keydown', responseHandler);
+    };
+
+    const handleResponse = (e, trialStartTime, trial) => {
+        const rt = e ? performance.now() - trialStartTime : RESPONSE_TIMEOUT;
+        const responseKey = e ? e.key : 'timeout';
+        const correct = e ? (e.key === 'ArrowLeft' && trial.targetDirection === 'left') || (e.key === 'ArrowRight' && trial.targetDirection === 'right') : false;
+
+        results.push({ ...trial, rt, correct });
+        logEvent('response', { rt: Math.round(rt), correct, response: responseKey });
+
+        showFeedback(correct, e === null);
+        currentTrialIndex++;
+        updateDashboard();
+        setTimeout(runTrial, FEEDBACK_DURATION);
+    };
+
+    const showFeedback = (correct, timeout) => {
+        clearStimuli();
+        if (timeout) {
+            feedbackTextEl.textContent = 'Too Slow';
+            feedbackTextEl.style.color = 'var(--incorrect-color)';
+        } else {
+            feedbackTextEl.textContent = correct ? 'Correct' : 'Incorrect';
+            feedbackTextEl.style.color = correct ? 'var(--correct-color)' : 'var(--incorrect-color)';
+        }
+        feedbackTextEl.style.display = 'block';
+        setTimeout(() => feedbackTextEl.style.display = 'none', FEEDBACK_DURATION - 100); // Hide just before next trial
+    };
+
+    const clearStimuli = () => {
+        fixationCrossEl.style.display = 'none';
+        cueStimulusEl.style.display = 'none';
+        targetStimulusEl.style.display = 'none';
+        feedbackTextEl.style.display = 'none';
+    };
+
+    const updateDashboard = () => {
+        trialProgressEl.textContent = `${currentTrialIndex}/${TOTAL_TRIALS}`;
+        if (results.length > 0) {
+            const correctCount = results.filter(r => r.correct).length;
+            const accuracy = Math.round((correctCount / results.length) * 100);
+            accuracyDisplayEl.textContent = `${accuracy}%`;
+        }
+    };
+
+    const calculateNetworkScores = () => {
+        const getMeanRt = (filterFn) => {
+            const trials = results.filter(r => r.correct && filterFn(r));
+            if (trials.length === 0) return 0;
+            return trials.reduce((sum, t) => sum + t.rt, 0) / trials.length;
+        };
+
+        const rtNoCue = getMeanRt(t => t.cueType === 'no_cue');
+        const rtDoubleCue = getMeanRt(t => t.cueType === 'double_cue');
+        const rtCenterCue = getMeanRt(t => t.cueType === 'center_cue');
+        const rtSpatialCue = getMeanRt(t => t.cueType === 'spatial_cue');
+        const rtCongruent = getMeanRt(t => t.flankerType === 'congruent');
+        const rtIncongruent = getMeanRt(t => t.flankerType === 'incongruent');
+
+        const alerting = Math.round(rtNoCue - rtDoubleCue);
+        const orienting = Math.round(rtCenterCue - rtSpatialCue);
+        const executive = Math.round(rtIncongruent - rtCongruent);
+        return { alerting, orienting, executive };
+    };
+
+    const endGame = () => {
+        gameState = 'finished';
+        logEvent('game_end');
+        const scores = calculateNetworkScores();
+        logEvent('network_scores', scores);
+
+        alertingScoreEl.textContent = scores.alerting;
+        orientingScoreEl.textContent = scores.orienting;
+        executiveScoreEl.textContent = scores.executive;
+
+        document.getElementById('final-summary').innerHTML = 
+            `<div>Alerting: <strong style="color: var(--primary-color)">${scores.alerting} ms</strong></div>
+             <div>Orienting: <strong style="color: var(--primary-color)">${scores.orienting} ms</strong></div>
+             <div>Executive Control: <strong style="color: var(--primary-color)">${scores.executive} ms</strong></div>`;
+
+        finalResultsModal.style.display = 'flex';
+        sendEventsToBackend();
+    };
+
+    const sendEventsToBackend = () => {
+        if (isSaving) return Promise.resolve();
+        isSaving = true;
+
+        const isCompleted = gameState === 'finished';
+        const completionStatus = isCompleted ? 'completed' : 'abandoned';
+        const totalDuration = performance.now() - gameStartTime;
+        const score = results.filter(r => r.correct).length;
+
+        logEvent('save_attempt', { status: completionStatus });
+
+        return fetch('/games/save-result/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+            body: JSON.stringify({
+                game_type: 'attention_network',
+                score: score,
+                duration: Math.round(totalDuration),
+                raw_data: { events, results },
+                completion_status: completionStatus
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (!data.success) console.error('Failed to save game data:', data.error);
+        })
+        .catch(error => console.error('Error saving game data:', error))
+        .finally(() => { isSaving = false; });
+    };
+
+    const navigateToGamesList = () => {
+        window.location.href = gameListUrl;
+    };
+
+    // --- EVENT LISTENERS ---
+    startGameBtn.addEventListener('click', startGame);
+
+    backToGamesBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.target.style.pointerEvents = 'none';
+        if (gameState === 'running') {
+            sendEventsToBackend().then(navigateToGamesList);
+        } else {
+            navigateToGamesList();
+        }
+    });
+
+    returnToGamesBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        navigateToGamesList();
+    });
+});
 </script>
 {% endblock %}

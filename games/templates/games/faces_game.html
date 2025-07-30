@@ -3,171 +3,338 @@
 <div class="max-w-lg mx-auto mt-4">
     <button id="back-to-games" class="inline-block mb-4 px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300">← Back to Games</button>
 </div>
-<div class="game-container max-w-lg mx-auto mt-8 p-6 bg-white rounded shadow">
-    <h2 class="text-2xl font-bold mb-2">Faces Game</h2>
-    <p class="mb-4">Identify if the two faces shown are the same or different. Try to maximize your correct answers over <span id="total-rounds">10</span> rounds.</p>
-    <div id="game-area">
-        <div id="round-info" class="mb-2 font-semibold">Round <span id="round-num">1</span> of <span id="total-rounds-2">10</span></div>
-        <div class="mb-2">Current score: <span id="score">0</span></div>
-        <div class="flex space-x-4 mb-4 items-center">
-            <img id="faceA" src="https://randomuser.me/api/portraits/men/1.jpg" alt="Face A" class="w-20 h-20 rounded-full border-2 border-blue-500" />
-            <span>vs</span>
-            <img id="faceB" src="https://randomuser.me/api/portraits/men/2.jpg" alt="Face B" class="w-20 h-20 rounded-full border-2 border-red-500" />
-        </div>
-        <div class="flex space-x-2 mb-2">
-            <button class="face-btn bg-blue-500 text-white px-4 py-2 rounded" data-choice="same">Same</button>
-            <button class="face-btn bg-red-500 text-white px-4 py-2 rounded" data-choice="different">Different</button>
-        </div>
-        <div id="feedback" class="mt-3 text-blue-600 font-semibold"></div>
-    </div>
+<style>
+    :root {
+        --bg-color: #1a1a1a;
+        --primary-color: #2c2c2c;
+        --secondary-color: #444;
+        --accent-color: #00aaff;
+        --text-color: #f0f0f0;
+        --success-color: #4ade80;
+        --error-color: #f87171;
+    }
+    .game-container {
+        background-color: var(--bg-color);
+        color: var(--text-color);
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        border: 1px solid var(--secondary-color);
+        border-radius: 12px;
+        padding: 2rem;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+    }
+    .dashboard {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 1rem;
+        margin-bottom: 2rem;
+        padding: 1rem;
+        background-color: var(--primary-color);
+        border-radius: 8px;
+    }
+    .metric {
+        text-align: center;
+    }
+    .metric-title {
+        font-size: 0.9rem;
+        color: #aaa;
+        text-transform: uppercase;
+    }
+    .metric-value {
+        font-size: 1.8rem;
+        font-weight: bold;
+        color: var(--accent-color);
+    }
+    #game-area {
+        height: 350px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background-color: var(--primary-color);
+        border-radius: 8px;
+        position: relative;
+        overflow: hidden;
+        margin-bottom: 2rem;
+    }
+    #face-image {
+        max-width: 90%;
+        max-height: 90%;
+        border-radius: 8px;
+        transition: transform 0.2s ease, opacity 0.2s ease;
+    }
+    #choice-buttons {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
+    }
+    .choice-btn {
+        background-color: var(--secondary-color);
+        color: var(--text-color);
+        padding: 1rem;
+        border: 1px solid #555;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 1.1rem;
+        transition: background-color 0.2s ease, transform 0.1s ease;
+    }
+    .choice-btn:hover { background-color: #555; }
+    .choice-btn:active { transform: scale(0.98); }
+    .modal {
+        display: flex;
+        position: fixed;
+        z-index: 100;
+        left: 0; top: 0;
+        width: 100%; height: 100%;
+        background-color: rgba(0,0,0,0.7);
+        justify-content: center;
+        align-items: center;
+    }
+    .modal-content {
+        background-color: var(--primary-color);
+        padding: 2rem;
+        border-radius: 12px;
+        border: 1px solid var(--secondary-color);
+        width: 90%;
+        max-width: 500px;
+        text-align: center;
+    }
+    .modal-content h2 { font-size: 2rem; margin-bottom: 1rem; }
+    .modal-content p { margin-bottom: 1.5rem; color: #ccc; }
+    .modal-btn {
+        background-color: var(--accent-color);
+        color: var(--text-color);
+        padding: 0.8rem 1.5rem;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 1rem;
+        transition: background-color 0.2s ease;
+    }
+    .modal-btn:hover { background-color: #0088cc; }
+</style>
 
+<div class="game-container max-w-2xl mx-auto mt-8">
+    <h2 class="text-3xl font-bold mb-4 text-center">Emotional Recognition Task</h2>
+    <div class="dashboard">
+        <div class="metric">
+            <div class="metric-title">Score</div>
+            <div id="score" class="metric-value">0</div>
+        </div>
+        <div class="metric">
+            <div class="metric-title">Accuracy</div>
+            <div id="accuracy" class="metric-value">100%</div>
+        </div>
+        <div class="metric">
+            <div class="metric-title">Round</div>
+            <div id="round" class="metric-value">1/24</div>
+        </div>
+    </div>
+    <div id="game-area">
+        <img id="face-image" src="" alt="Face" style="display: none;"/>
+    </div>
+    <div id="choice-buttons">
+        <button class="choice-btn" data-choice="happy">Happy</button>
+        <button class="choice-btn" data-choice="sad">Sad</button>
+        <button class="choice-btn" data-choice="angry">Angry</button>
+        <button class="choice-btn" data-choice="surprised">Surprised</button>
+    </div>
+</div>
+
+<!-- Instruction Modal -->
+<div id="instruction-modal" class="modal">
+    <div class="modal-content">
+        <h2>Emotional Recognition Task</h2>
+        <p>A series of faces will be shown. For each face, select the emotion you think it is displaying.</p>
+        <p>Respond as quickly and accurately as you can. Your score is based on both speed and accuracy.</p>
+        <button id="start-game-btn" class="modal-btn">Start Game</button>
+    </div>
+</div>
+
+<!-- Final Results Modal -->
+<div id="final-results-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <h2>Task Complete!</h2>
+        <p id="final-score">Your score: 0</p>
+        <p id="final-summary">Accuracy: 100%</p>
+        <a href="/games/" class="modal-btn">Back to Games</a>
+    </div>
 </div>
 <script>
-const TOTAL_ROUNDS = 10;
-let currentRound = 1;
-let score = 0;
-let events = [];
-let difficulty = 'medium';
-let correctAnswer = 'same';
-let roundStart = null;
-
-function randomFaces() {
-    // Use randomuser.me for demo; in production, use your own dataset
-    const idA = Math.floor(Math.random() * 50) + 1;
-    let idB = Math.floor(Math.random() * 50) + 1;
-    let same = Math.random() < 0.5;
-    if (same) idB = idA;
-    correctAnswer = same ? 'same' : 'different';
-    document.getElementById('faceA').src = `https://randomuser.me/api/portraits/men/${idA}.jpg`;
-    document.getElementById('faceB').src = `https://randomuser.me/api/portraits/men/${idB}.jpg`;
-    roundStart = Date.now();
-}
-
-function logEvent(type, data) {
-    events.push({
-        event_type: type,
-        round: currentRound,
-        score: score,
-        difficulty: difficulty,
-        correct: correctAnswer,
-        timestamp: Date.now(),
-        ...data
-    });
-}
-
-function updateUI() {
-    document.getElementById('round-num').textContent = currentRound;
-    document.getElementById('total-rounds').textContent = TOTAL_ROUNDS;
-    document.getElementById('total-rounds-2').textContent = TOTAL_ROUNDS;
-    document.getElementById('score').textContent = score;
-    document.getElementById('feedback').textContent = '';
-    randomFaces();
-}
-
-document.querySelectorAll('.face-btn').forEach(btn => {
-    btn.onclick = function() {
-        const choice = btn.getAttribute('data-choice');
-        const rt = Date.now() - roundStart;
-        const correct = choice === correctAnswer;
-        logEvent('response', {choice: choice, correct: correct, reaction_time: rt});
-        if (correct) {
-            score += 1;
-            document.getElementById('feedback').textContent = `Correct! (+1)`;
-        } else {
-            document.getElementById('feedback').textContent = `Incorrect.`;
-        }
-        if (currentRound < TOTAL_ROUNDS) {
-            currentRound++;
-            setTimeout(() => {
-                updateUI();
-            }, 800);
-        } else {
-            document.getElementById('game-area').innerHTML = `<div class='font-bold text-lg'>Game Over! Final score: ${score}</div>`;
-            logEvent('end', {final_score: score});
-            // Mark that we're saving to backend to avoid duplicate saves
-            logEvent('backend_saved', {});
-            sendEventsToBackend();
-            currentRound = TOTAL_ROUNDS + 1; // Mark game as completed
-        }
+document.addEventListener('DOMContentLoaded', () => {
+    // Game Elements
+    const elements = {
+        score: document.getElementById('score'),
+        accuracy: document.getElementById('accuracy'),
+        round: document.getElementById('round'),
+        faceImage: document.getElementById('face-image'),
+        choiceButtons: document.querySelectorAll('.choice-btn'),
+        instructionModal: document.getElementById('instruction-modal'),
+        finalResultsModal: document.getElementById('final-results-modal'),
+        startGameBtn: document.getElementById('start-game-btn'),
+        backToGamesBtn: document.getElementById('back-to-games')
     };
-});
 
-document.getElementById('back-to-games').onclick = function() {
-    // Disable the button to prevent double clicks
-    document.getElementById('back-to-games').disabled = true;
-    // If game is still active, end session first
-    if (currentRound <= TOTAL_ROUNDS) {
-        logEvent('manual_end', {final_score: score});
-        document.querySelectorAll('.face-btn').forEach(btn => btn.disabled = true);
-        document.getElementById('game-area').innerHTML = `<div class='font-bold text-lg text-red-600'>Session Ended! Final score: ${score}</div>`;
-        // Save data and then redirect
-        sendEventsToBackend().then(() => {
-            window.location.href = '/games/';
-        }).catch(() => {
-            // Even if save fails, still redirect
-            window.location.href = '/games/';
-        });
-    } else {
-        // Game is completed, ensure data is saved before redirecting
-        // Check if we need to save the completed game data
-        if (events.length > 0 && !events.some(e => e.event_type === 'backend_saved')) {
-            // Mark that we're saving to backend to avoid duplicate saves
-            logEvent('backend_saved', {});
-            sendEventsToBackend().then(() => {
-                window.location.href = '/games/';
-            }).catch(() => {
-                // Even if save fails, still redirect
-                window.location.href = '/games/';
-            });
-        } else {
-            // Data already saved or no data to save, safe to redirect
-            window.location.href = '/games/';
-        }
-    }
-};
+    // Stimuli Set (using local paths)
+    const STIMULI = [
+        { emotion: 'happy', path: '/static/games/faces/happy_01.jpg' },
+        { emotion: 'happy', path: '/static/games/faces/happy_02.jpg' },
+        { emotion: 'sad', path: '/static/games/faces/sad_01.jpg' },
+        { emotion: 'sad', path: '/static/games/faces/sad_02.jpg' },
+        { emotion: 'angry', path: '/static/games/faces/angry_01.jpg' },
+        { emotion: 'angry', path: '/static/games/faces/angry_02.jpg' },
+        { emotion: 'surprised', path: '/static/games/faces/surprised_01.jpg' },
+        { emotion: 'surprised', path: '/static/games/faces/surprised_02.jpg' },
+        // Add more stimuli for a full set of 24
+    ].flatMap(item => Array(3).fill(item)); // Repeat to get 24 trials
 
-function sendEventsToBackend() {
-    return fetch('/games/save_game_result/', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': getCookie('csrftoken')
-        },
-        body: JSON.stringify({
-            game_type: 'faces_game',
-            score: score,
-            duration: TOTAL_ROUNDS * 10,
-            decisions: events.filter(e => e.event_type === 'response'),
-            reaction_times: events.filter(e => e.event_type === 'response').map(e => e.reaction_time),
-            raw_data: {events: events}
-        })
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.success) {
-            console.log('Session saved successfully');
-        } else {
-            console.error('Error saving session: ' + data.error);
-        }
-        return data;
-    });
-}
+    // Game State
+    let state = {
+        score: 0,
+        currentRound: 0,
+        hits: 0,
+        stimuliOrder: [],
+        roundStartTime: 0,
+        gameStartTime: 0,
+        gameCompleted: false,
+        isResponding: false,
+        eventsLog: []
+    };
 
-function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
             }
         }
+        return cookieValue;
     }
-    return cookieValue;
-}
 
-updateUI();
+    function logEvent(type, data) {
+        state.eventsLog.push({
+            event_type: type,
+            round: state.currentRound + 1,
+            timestamp: Date.now() - state.gameStartTime,
+            ...data
+        });
+    }
+
+    function updateDashboard() {
+        const accuracy = state.currentRound > 0 ? (state.hits / state.currentRound * 100).toFixed(0) : 100;
+        elements.score.textContent = state.score;
+        elements.accuracy.textContent = `${accuracy}%`;
+        elements.round.textContent = `${state.currentRound}/${STIMULI.length}`;
+    }
+
+    function generateTrial() {
+        if (state.currentRound >= STIMULI.length) {
+            endGame();
+            return;
+        }
+        state.isResponding = false;
+        updateDashboard();
+        
+        const stimulus = state.stimuliOrder[state.currentRound];
+        elements.faceImage.src = stimulus.path;
+        elements.faceImage.style.display = 'block';
+        elements.faceImage.style.opacity = 1;
+
+        state.roundStartTime = Date.now();
+        logEvent('trial_start', { stimulus_path: stimulus.path, correct_emotion: stimulus.emotion });
+    }
+
+    function handleChoice(choice) {
+        if (state.isResponding) return;
+        state.isResponding = true;
+
+        const reactionTime = Date.now() - state.roundStartTime;
+        const stimulus = state.stimuliOrder[state.currentRound];
+        const isCorrect = choice === stimulus.emotion;
+
+        logEvent('response', { choice, is_correct: isCorrect, reaction_time: reactionTime });
+
+        if (isCorrect) {
+            state.hits++;
+            state.score += 100 + Math.max(0, 50 - Math.floor(reactionTime / 100));
+        }
+
+        state.currentRound++;
+        elements.faceImage.style.opacity = 0;
+        setTimeout(generateTrial, 500); // Pause before next trial
+    }
+
+    function startGame() {
+        elements.instructionModal.style.display = 'none';
+        state.gameStartTime = Date.now();
+        // Shuffle stimuli for random order
+        state.stimuliOrder = STIMULI.sort(() => Math.random() - 0.5);
+        logEvent('game_start', {});
+        generateTrial();
+    }
+
+    function endGame() {
+        state.gameCompleted = true;
+        logEvent('game_end', { final_score: state.score, hits: state.hits });
+
+        const finalAccuracy = state.currentRound > 0 ? (state.hits / state.currentRound * 100).toFixed(1) : 'N/A';
+        document.getElementById('final-score').textContent = `Your score: ${state.score}`;
+        document.getElementById('final-summary').textContent = `Accuracy: ${finalAccuracy}%`;
+        elements.finalResultsModal.style.display = 'flex';
+
+        saveGameResult();
+    }
+
+    function quitGame() {
+        state.gameCompleted = false;
+        logEvent('game_quit', { final_score: state.score });
+        const savePromise = saveGameResult();
+        savePromise.finally(() => { window.location.href = '/games/'; });
+    }
+
+    function saveGameResult() {
+        const duration = (Date.now() - state.gameStartTime) / 1000;
+        const payload = {
+            game_type: 'emotional_recognition',
+            score: state.score,
+            duration: duration.toFixed(2),
+            completion_status: state.gameCompleted ? 'completed' : 'abandoned',
+            raw_data: {
+                hits: state.hits,
+                total_rounds: state.currentRound,
+                events: state.eventsLog
+            }
+        };
+
+        return fetch('/games/save-result/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify(payload)
+        }).then(res => {
+            if (!res.ok) console.error('Failed to save game data.');
+            return res.json();
+        }).catch(error => console.error('Error saving game data:', error));
+    }
+
+    // Event Listeners
+    elements.startGameBtn.addEventListener('click', startGame);
+    elements.choiceButtons.forEach(btn => {
+        btn.addEventListener('click', () => handleChoice(btn.dataset.choice));
+    });
+    elements.backToGamesBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (state.currentRound > 0 && state.currentRound < STIMULI.length) {
+            quitGame();
+        } else {
+            window.location.href = '/games/';
+        }
+    });
+});
 </script>
 {% endblock %}

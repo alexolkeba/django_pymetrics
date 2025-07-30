@@ -1,177 +1,374 @@
 {% extends 'base.html' %}
+{% load static %}
 {% block content %}
-<div class="max-w-lg mx-auto mt-4">
-    <button id="back-to-games" class="inline-block mb-4 px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300">← Back to Games</button>
-</div>
-<div class="game-container max-w-lg mx-auto mt-8 p-6 bg-white rounded shadow">
-    <h2 class="text-2xl font-bold mb-2">Lengths Game</h2>
-    <p class="mb-4">Estimate which of two lines is longer. Try to maximize your correct answers over <span id="total-rounds">10</span> rounds.</p>
-    <div id="game-area">
-        <div id="round-info" class="mb-2 font-semibold">Round <span id="round-num">1</span> of <span id="total-rounds-2">10</span></div>
-        <div class="mb-2">Current score: <span id="score">0</span></div>
-        <div class="flex space-x-4 mb-4 items-center">
-            <div id="lineA" style="height: 10px; background: #3490dc;"></div>
-            <span>vs</span>
-            <div id="lineB" style="height: 10px; background: #e3342f;"></div>
+<style>
+    :root {
+        --primary-color: #38BDF8; /* Light Blue */
+        --secondary-color: #F472B6; /* Pink */
+        --background-color: #111827;
+        --text-color: #F3F4F6;
+        --container-bg: #1F2937;
+        --success-color: #34D399;
+        --error-color: #F87171;
+    }
+    .game-body {
+        background-color: var(--background-color);
+        color: var(--text-color);
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        padding: 1rem;
+    }
+    .game-container {
+        background-color: var(--container-bg);
+        border-radius: 12px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+        width: 100%;
+        max-width: 700px;
+        overflow: hidden;
+    }
+    .game-header {
+        background-color: #0E7490; /* Darker Cyan */
+        color: white;
+        padding: 1rem 1.5rem;
+        text-align: center;
+    }
+    .dashboard {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 1rem;
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid #374151;
+    }
+    .stat-card {
+        background-color: #374151;
+        padding: 0.75rem;
+        border-radius: 8px;
+        text-align: center;
+    }
+    .stat-card .value {
+        font-size: 1.5rem;
+        font-weight: bold;
+        color: var(--primary-color);
+    }
+    .stat-card .label {
+        font-size: 0.875rem;
+        color: #9CA3AF;
+    }
+    .stimulus-area {
+        padding: 2rem 1rem;
+        min-height: 250px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        gap: 2rem;
+    }
+    .line-container {
+        width: 80%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+    .line {
+        height: 12px;
+        border-radius: 6px;
+        transition: width 0.3s ease-in-out;
+    }
+    #line-A {
+        background-color: var(--primary-color);
+    }
+    #line-B {
+        background-color: var(--secondary-color);
+    }
+    .choice-buttons {
+        display: flex;
+        gap: 1rem;
+        padding: 1rem 1.5rem;
+        background-color: #374151;
+        justify-content: center;
+    }
+    .choice-btn {
+        padding: 0.75rem 2rem;
+        border: none;
+        border-radius: 8px;
+        font-size: 1rem;
+        font-weight: bold;
+        cursor: pointer;
+        color: white;
+        flex-grow: 1;
+        max-width: 200px;
+    }
+    .modal {
+        display: none;
+        position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%;
+        background-color: rgba(0,0,0,0.7);
+        justify-content: center; align-items: center;
+    }
+    .modal-content {
+        background-color: var(--container-bg); padding: 2rem; border-radius: 12px;
+        max-width: 500px; width: 90%; text-align: center;
+    }
+    #back-to-games {
+        position: absolute; top: 20px; left: 20px; background-color: rgba(55, 65, 81, 0.8);
+        color: var(--text-color); padding: 0.5rem 1rem; border-radius: 8px;
+        text-decoration: none; font-weight: bold; z-index: 10;
+    }
+    #feedback-indicator {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 3rem;
+        font-weight: bold;
+        opacity: 0;
+        transition: opacity 0.5s;
+    }
+</style>
+
+<div class="game-body">
+    <a href="/games/" id="back-to-games">← Back to Games</a>
+
+    <div class="game-container">
+        <div class="game-header">
+            <h2>Perceptual Acuity Challenge</h2>
         </div>
-        <div class="flex space-x-2 mb-2">
-            <button class="length-btn bg-blue-500 text-white px-4 py-2 rounded" data-choice="A">Line A</button>
-            <button class="length-btn bg-red-500 text-white px-4 py-2 rounded" data-choice="B">Line B</button>
+
+        <!-- Dashboard -->
+        <div class="dashboard">
+            <div class="stat-card"><div id="score" class="value">0</div><div class="label">Score</div></div>
+            <div class="stat-card"><div id="round" class="value">1/40</div><div class="label">Round</div></div>
+            <div class="stat-card"><div id="streak" class="value">0</div><div class="label">Streak</div></div>
+            <div class="stat-card"><div id="difficulty" class="value">50%</div><div class="label">Difference</div></div>
         </div>
-        <div id="feedback" class="mt-3 text-blue-600 font-semibold"></div>
+
+        <!-- Stimulus Area -->
+        <div class="stimulus-area">
+            <div id="feedback-indicator"></div>
+            <div class="line-container">
+                <div id="line-A" class="line"></div>
+            </div>
+            <div class="line-container">
+                <div id="line-B" class="line"></div>
+            </div>
+        </div>
+
+        <!-- Choice Buttons -->
+        <div class="choice-buttons">
+            <button id="btn-A" class="choice-btn" style="background-color: var(--primary-color);">Top Line</button>
+            <button id="btn-B" class="choice-btn" style="background-color: var(--secondary-color);">Bottom Line</button>
+        </div>
     </div>
 
+    <!-- Instruction Modal -->
+    <div id="instruction-modal" class="modal" style="display: flex;">
+        <div class="modal-content">
+            <h3 style="font-size: 1.5rem; font-weight: bold; color: var(--primary-color);">Perceptual Acuity Challenge</h3>
+            <p style="margin-top: 1rem;">In each round, two lines of slightly different lengths will be shown.</p>
+            <p style="margin-top: 1rem;">Your task is to identify the <strong>longer</strong> line. The task gets harder as you succeed.</p>
+            <p style="margin-top: 1rem;">Points are awarded for speed and accuracy. Good luck!</p>
+            <button id="start-game-btn" class="choice-btn" style="margin-top: 1.5rem; background-color: var(--primary-color);">Start</button>
+        </div>
+    </div>
+
+    <!-- Final Results Modal -->
+    <div id="final-results-modal" class="modal">
+        <div class="modal-content">
+            <h3 style="font-size: 1.5rem; font-weight: bold; color: var(--primary-color);">Challenge Complete!</h3>
+            <div id="final-score" style="font-size: 2rem; font-weight: bold; margin: 1rem 0;"></div>
+            <p id="final-summary" style="margin-bottom: 1.5rem;"></p>
+            <a href="/games/" class="choice-btn" style="background-color: var(--primary-color); text-decoration: none;">Return to Games</a>
+        </div>
+    </div>
 </div>
+
 <script>
-const TOTAL_ROUNDS = 10;
-let currentRound = 1;
-let score = 0;
-let events = [];
-let difficulty = 'medium';
-let correctLine = 'A';
-let roundStart = null;
-
-function randomLengths() {
-    // Generate two random lengths, ensure difference is visible
-    let base = 100 + Math.floor(Math.random() * 100);
-    let diff = 20 + Math.floor(Math.random() * 60);
-    if (Math.random() < 0.5) {
-        return {A: base, B: base + diff, correct: 'B'};
-    } else {
-        return {A: base + diff, B: base, correct: 'A'};
-    }
-}
-
-function showLines() {
-    const {A, B, correct} = randomLengths();
-    document.getElementById('lineA').style.width = `${A}px`;
-    document.getElementById('lineB').style.width = `${B}px`;
-    correctLine = correct;
-    roundStart = Date.now();
-}
-
-function logEvent(type, data) {
-    events.push({
-        event_type: type,
-        round: currentRound,
-        score: score,
-        difficulty: difficulty,
-        correct: correctLine,
-        timestamp: Date.now(),
-        ...data
-    });
-}
-
-function updateUI() {
-    document.getElementById('round-num').textContent = currentRound;
-    document.getElementById('total-rounds').textContent = TOTAL_ROUNDS;
-    document.getElementById('total-rounds-2').textContent = TOTAL_ROUNDS;
-    document.getElementById('score').textContent = score;
-    document.getElementById('feedback').textContent = '';
-    showLines();
-}
-
-document.querySelectorAll('.length-btn').forEach(btn => {
-    btn.onclick = function() {
-        const choice = btn.getAttribute('data-choice');
-        const rt = Date.now() - roundStart;
-        const correct = choice === correctLine;
-        logEvent('response', {choice: choice, correct: correct, reaction_time: rt});
-        if (correct) {
-            score += 1;
-            document.getElementById('feedback').textContent = `Correct! (+1)`;
-        } else {
-            document.getElementById('feedback').textContent = `Incorrect.`;
-        }
-        if (currentRound < TOTAL_ROUNDS) {
-            currentRound++;
-            setTimeout(() => {
-                updateUI();
-            }, 800);
-        } else {
-            document.getElementById('game-area').innerHTML = `<div class='font-bold text-lg'>Game Over! Final score: ${score}</div>`;
-            logEvent('end', {final_score: score});
-            // Mark that we're saving to backend to avoid duplicate saves
-            logEvent('backend_saved', {});
-            sendEventsToBackend();
-        }
+document.addEventListener('DOMContentLoaded', () => {
+    // Game Elements
+    const elements = {
+        score: document.getElementById('score'),
+        round: document.getElementById('round'),
+        streak: document.getElementById('streak'),
+        difficulty: document.getElementById('difficulty'),
+        lineA: document.getElementById('line-A'),
+        lineB: document.getElementById('line-B'),
+        btnA: document.getElementById('btn-A'),
+        btnB: document.getElementById('btn-B'),
+        feedback: document.getElementById('feedback-indicator'),
+        instructionModal: document.getElementById('instruction-modal'),
+        finalResultsModal: document.getElementById('final-results-modal'),
+        startGameBtn: document.getElementById('start-game-btn'),
+        backToGamesBtn: document.getElementById('back-to-games')
     };
-});
 
-document.getElementById('back-to-games').onclick = function() {
-    // If game is still active, end session first
-    if (currentRound <= TOTAL_ROUNDS) {
-        logEvent('manual_end', {final_score: score});
-        document.querySelectorAll('.length-btn').forEach(btn => btn.disabled = true);
-        document.getElementById('game-area').innerHTML = `<div class='font-bold text-lg text-red-600'>Session Ended! Final score: ${score}</div>`;
-        // Save data and then redirect
-        sendEventsToBackend().then(() => {
-            window.location.href = '/games/';
-        }).catch(() => {
-            // Even if save fails, still redirect
-            window.location.href = '/games/';
-        });
-    } else {
-        // Game is completed, ensure data is saved before redirecting
-        // Check if we need to save the completed game data
-        if (events.length > 0 && !events.some(e => e.event_type === 'backend_saved')) {
-            // Mark that we're saving to backend to avoid duplicate saves
-            logEvent('backend_saved', {});
-            sendEventsToBackend().then(() => {
-                window.location.href = '/games/';
-            }).catch(() => {
-                // Even if save fails, still redirect
-                window.location.href = '/games/';
-            });
-        } else {
-            // Data already saved or no data to save, safe to redirect
-            window.location.href = '/games/';
-        }
-    }
-};
+    // Game Config
+    const TOTAL_ROUNDS = 40;
+    const BASE_LINE_WIDTH = 40; // in percent
 
-function sendEventsToBackend() {
-    return fetch('/games/save_game_result/', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': getCookie('csrftoken')
-        },
-        body: JSON.stringify({
-            game_type: 'lengths_game',
-            score: score,
-            duration: TOTAL_ROUNDS * 10,
-            decisions: events.filter(e => e.event_type === 'response'),
-            reaction_times: events.filter(e => e.event_type === 'response').map(e => e.reaction_time),
-            raw_data: {events: events}
-        })
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.success) {
-            console.log('Session saved successfully');
-        } else {
-            console.error('Error saving session: ' + data.error);
-        }
-        return data;
-    });
-}
+    // Game State
+    let state = {
+        score: 0,
+        currentRound: 1,
+        streak: 0,
+        difficulty: 0.5, // Represents 50% difference
+        minDifficulty: 0.01,
+        maxDifficulty: 0.8,
+        correctLine: null,
+        roundStartTime: 0,
+        gameStartTime: 0,
+        gameCompleted: false,
+        eventsLog: [],
+        isResponding: false
+    };
 
-function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
             }
         }
+        return cookieValue;
     }
-    return cookieValue;
-}
 
-updateUI();
+    function logEvent(type, data) {
+        state.eventsLog.push({
+            event_type: type,
+            round: state.currentRound,
+            timestamp: Date.now() - state.gameStartTime,
+            difficulty: state.difficulty,
+            ...data
+        });
+    }
+
+    function updateDashboard() {
+        elements.score.textContent = state.score;
+        elements.round.textContent = `${state.currentRound}/${TOTAL_ROUNDS}`;
+        elements.streak.textContent = state.streak;
+        elements.difficulty.textContent = `${(state.difficulty * 100).toFixed(0)}%`;
+    }
+
+    function generateTrial() {
+        if (state.currentRound > TOTAL_ROUNDS) {
+            endGame();
+            return;
+        }
+        state.isResponding = false;
+        const isAlonger = Math.random() > 0.5;
+        const shorterLineWidth = BASE_LINE_WIDTH + Math.random() * 10;
+        const longerLineWidth = shorterLineWidth * (1 + state.difficulty);
+
+        elements.lineA.style.width = `${isAlonger ? longerLineWidth : shorterLineWidth}%`;
+        elements.lineB.style.width = `${isAlonger ? shorterLineWidth : longerLineWidth}%`;
+        state.correctLine = isAlonger ? 'A' : 'B';
+        
+        logEvent('trial_start', { line_A_width: elements.lineA.style.width, line_B_width: elements.lineB.style.width, correct_line: state.correctLine });
+        updateDashboard();
+        state.roundStartTime = Date.now();
+    }
+
+    function handleChoice(choice) {
+        if (state.isResponding) return;
+        state.isResponding = true;
+
+        const reactionTime = Date.now() - state.roundStartTime;
+        const isCorrect = choice === state.correctLine;
+
+        logEvent('response', { choice, is_correct: isCorrect, reaction_time: reactionTime });
+
+        if (isCorrect) {
+            state.score += 100 + Math.max(0, 50 - Math.floor(reactionTime / 100));
+            state.streak++;
+            // Decrease difficulty (make it harder)
+            state.difficulty = Math.max(state.minDifficulty, state.difficulty * 0.85);
+            showFeedback(true);
+        } else {
+            state.streak = 0;
+            // Increase difficulty (make it easier)
+            state.difficulty = Math.min(state.maxDifficulty, state.difficulty * 1.5);
+            showFeedback(false);
+        }
+
+        state.currentRound++;
+        setTimeout(generateTrial, 1200);
+    }
+
+    function showFeedback(isCorrect) {
+        elements.feedback.textContent = isCorrect ? '✓' : '✗';
+        elements.feedback.style.color = isCorrect ? 'var(--success-color)' : 'var(--error-color)';
+        elements.feedback.style.opacity = 1;
+        setTimeout(() => { elements.feedback.style.opacity = 0; }, 800);
+    }
+
+    function startGame() {
+        elements.instructionModal.style.display = 'none';
+        state.gameStartTime = Date.now();
+        logEvent('game_start', {});
+        generateTrial();
+    }
+
+    function endGame() {
+        state.gameCompleted = true;
+        logEvent('game_end', { final_score: state.score, final_difficulty: state.difficulty });
+
+        document.getElementById('final-score').textContent = `Score: ${state.score}`;
+        const jnd = (state.difficulty * 100).toFixed(1);
+        document.getElementById('final-summary').textContent = `Your Just Noticeable Difference (JND) was estimated at ${jnd}%. This is the smallest difference you could reliably detect.`;
+        elements.finalResultsModal.style.display = 'flex';
+
+        saveGameResult();
+    }
+
+    function quitGame() {
+        logEvent('game_quit', { final_score: state.score });
+        const savePromise = saveGameResult();
+        savePromise.finally(() => { window.location.href = '/games/'; });
+    }
+
+    function saveGameResult() {
+        const duration = (Date.now() - state.gameStartTime) / 1000;
+        const payload = {
+            game_type: 'lengths_acuity',
+            score: state.score,
+            duration: duration.toFixed(2),
+            completion_status: state.gameCompleted ? 'completed' : 'abandoned',
+            raw_data: {
+                final_difficulty: state.difficulty,
+                jnd_estimate_percent: state.difficulty * 100,
+                total_rounds: state.currentRound - 1,
+                streak: state.streak,
+                events: state.eventsLog
+            }
+        };
+
+        return fetch('/games/save-result/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify(payload)
+        }).then(res => {
+            if (!res.ok) console.error('Failed to save game data.');
+            return res.json();
+        }).catch(error => console.error('Error saving game data:', error));
+    }
+
+    // Event Listeners
+    elements.startGameBtn.addEventListener('click', startGame);
+    elements.btnA.addEventListener('click', () => handleChoice('A'));
+    elements.btnB.addEventListener('click', () => handleChoice('B'));
+    elements.backToGamesBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        quitGame();
+    });
+});
 </script>
 {% endblock %}

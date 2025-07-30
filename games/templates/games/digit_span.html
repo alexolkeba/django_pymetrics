@@ -1,280 +1,290 @@
 {% extends 'base.html' %}
-
-{% block title %}Digit Span Game - Rasmetric{% endblock %}
-
+{% load static %}
 {% block content %}
-<div class="min-h-screen bg-gray-50">
-  <div class="max-w-4xl mx-auto px-4 py-8">
-    <button
-      onclick="window.location.href='{% url 'games:game_list' %}'"
-      class="flex items-center text-gray-600 hover:text-gray-900 mb-6"
-    >
-      <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-      </svg>
-      Back to Games
-    </button>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+<style>
+    :root {
+        --primary-color: #6366F1; /* Indigo 500 */
+        --success-color: #34D399; /* Green 400 */
+        --danger-color: #F87171; /* Red 400 */
+        --background-color: #0F172A; /* Slate 900 */
+        --surface-color: #1E293B; /* Slate 800 */
+        --text-color: #F1F5F9; /* Slate 100 */
+        --muted-text-color: #94A3B8; /* Slate 400 */
+        --border-color: #334155; /* Slate 700 */
+    }
+    .game-body { background-color: var(--background-color); color: var(--text-color); font-family: 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 1rem; }
+    .game-container { background-color: var(--surface-color); border-radius: 12px; border: 1px solid var(--border-color); box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3); width: 100%; max-width: 600px; overflow: hidden; }
+    .game-header { background-color: rgba(0,0,0,0.2); padding: 1.5rem; text-align: center; border-bottom: 1px solid var(--border-color); }
+    .game-header h2 { font-size: 1.75rem; font-weight: bold; margin: 0; }
+    .dashboard { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; padding: 1.5rem; border-bottom: 1px solid var(--border-color); }
+    .stat-card { background-color: rgba(0,0,0,0.2); padding: 1rem; border-radius: 8px; text-align: center; }
+    .stat-card .value { font-size: 1.75rem; font-weight: bold; color: var(--primary-color); }
+    .stat-card .label { font-size: 0.8rem; color: var(--muted-text-color); text-transform: uppercase; font-weight: 600; }
+    .game-area { padding: 2rem; min-height: 350px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+    #sequence-display { font-size: 3.5rem; font-weight: bold; letter-spacing: 0.5rem; height: 60px; margin-bottom: 1rem; }
+    #input-area { width: 100%; max-width: 300px; }
+    #user-input { background-color: #0F172A; border: 2px solid var(--border-color); color: var(--text-color); font-size: 2rem; text-align: center; width: 100%; border-radius: 8px; padding: 0.5rem; margin-bottom: 1rem; }
+    .numpad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; }
+    .numpad button { background-color: var(--surface-color); border: 1px solid var(--border-color); color: var(--text-color); font-size: 1.5rem; padding: 1rem; border-radius: 8px; cursor: pointer; transition: background-color 0.2s; }
+    .numpad button:hover { background-color: var(--primary-color); }
+    .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); justify-content: center; align-items: center; }
+    .modal-content { background-color: var(--surface-color); padding: 2.5rem; border-radius: 12px; border: 1px solid var(--border-color); max-width: 500px; width: 90%; box-shadow: 0 5px 15px rgba(0,0,0,0.5); animation: modal-pop 0.3s ease-out; text-align: center; }
+    @keyframes modal-pop { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    #back-to-games-btn { position: absolute; top: 20px; left: 20px; background-color: rgba(0, 0, 0, 0.3); color: var(--text-color); padding: 0.5rem 1rem; border-radius: 8px; text-decoration: none; font-weight: bold; z-index: 10; }
+</style>
 
-    <div id="gameContainer" class="text-center"></div>
-    <div id="gameOverContainer" class="text-center hidden">
-      <h2 class="text-2xl font-bold text-gray-900 mb-4">Memory Test Complete!</h2>
-      <div class="bg-blue-50 rounded-lg p-6 mb-6">
-        <p class="text-lg text-gray-700 mb-2">Final Score: <span id="finalScore" class="font-bold text-blue-600">0</span></p>
-        <p class="text-lg text-gray-700 mb-2">Max Span: <span id="finalMaxSpan" class="font-bold text-green-600">0</span> digits</p>
-        <p class="text-lg text-gray-700 mb-2">Accuracy: <span id="finalAccuracy" class="font-bold text-blue-600">0%</span></p>
-        <p class="text-sm text-gray-600">Working Memory Span: <span id="finalSpan">0</span>/9</p>
-      </div>
-      <button
-        onclick="window.location.href='{% url 'games:game_list' %}'"
-        class="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700"
-      >
-        Continue
-      </button>
+<div class="game-body" data-game-list-url="{% url 'games:game_list' %}" data-csrf-token="{{ csrf_token }}">
+    <a href="#" id="back-to-games-btn"><i class="fas fa-arrow-left"></i> Back to Games</a>
+
+    <div class="game-container">
+        <div class="game-header"><h2>Working Memory Challenge</h2></div>
+        <div class="dashboard">
+            <div class="stat-card"><div id="task-type" class="value">-</div><div class="label">Task</div></div>
+            <div class="stat-card"><div id="current-span" class="value">-</div><div class="label">Current Span</div></div>
+            <div class="stat-card"><div id="max-span" class="value">-</div><div class="label">Max Span</div></div>
+        </div>
+
+        <div class="game-area">
+            <div id="sequence-display"></div>
+            <div id="input-area" style="display: none;">
+                <input type="text" id="user-input" readonly>
+                <div class="numpad"></div>
+                <button id="submit-btn" class="btn" style="width: 100%; margin-top: 1rem; background-color: var(--success-color);">Submit</button>
+            </div>
+            <p id="feedback-text" style="height: 20px; margin-top: 1rem; font-weight: bold;"></p>
+        </div>
     </div>
-  </div>
+
+    <!-- Modals -->
+    <div id="instruction-modal" class="modal" style="display: flex;">
+        <div class="modal-content">
+            <h3 style="font-size: 1.5rem; font-weight: bold; color: var(--primary-color);">Welcome to the Working Memory Challenge!</h3>
+            <p style="margin: 1rem 0;">You will be tested on two tasks: <strong>Forward Span</strong> and <strong>Backward Span</strong>. A sequence of numbers will appear. Your goal is to recall them in the correct order. The sequence length will increase as you succeed. The challenge ends after two incorrect attempts on any given length.</p>
+            <button id="start-game-btn" class="btn">Start Challenge</button>
+        </div>
+    </div>
+    <div id="final-results-modal" class="modal">
+        <div class="modal-content">
+            <h3 style="font-size: 1.5rem; font-weight: bold;">Challenge Complete!</h3>
+            <div id="final-summary" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem 1rem; text-align: left; margin: 1.5rem auto; width: fit-content;"></div>
+            <button id="return-to-games-final-btn" class="btn">Return to Games</button>
+        </div>
+    </div>
 </div>
 
 <script>
-const maxRounds = 20;
-let gamePhase = 'instructions';
-let currentSequence = [];
-let userInput = [];
-let sequenceLength = 3;
-let currentDigitIndex = 0;
-let score = 0;
-let consecutiveCorrect = 0;
-let consecutiveWrong = 0;
-let round = 1;
-let startTime = Date.now();
-let decisions = [];
-let reactionTimes = [];
-let inputStartTime = 0;
-let feedback = '';
+document.addEventListener('DOMContentLoaded', () => {
+    // --- CONFIGURATION ---
+    const GAME_ID = 'digit_span';
+    const STARTING_SPAN = 3;
+    const MAX_INCORRECT_STREAK = 2;
+    const PRESENTATION_SPEED_MS = 1000;
+    const FEEDBACK_DELAY_MS = 1500;
 
-function renderGame() {
-  const container = document.getElementById('gameContainer');
-  container.innerHTML = '';
-  if (gamePhase === 'instructions') {
-    const title = document.createElement('h2');
-    title.className = 'text-2xl font-bold text-gray-900 mb-4';
-    title.textContent = 'Digit Span Memory';
-    container.appendChild(title);
-    const box = document.createElement('div');
-    box.className = 'bg-white rounded-lg shadow-sm p-8 mb-6';
-    box.innerHTML = `
-      <div class="mb-6">
-        <p class="text-lg text-gray-700 mb-4">You will see a sequence of numbers.</p>
-        <p class="text-lg text-gray-700 mb-4">Watch carefully and remember the order.</p>
-        <p class="text-lg text-gray-700 mb-4">Then click the numbers in the same sequence.</p>
-      </div>
-      <button id="startBtn" class="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700">Start Game</button>
-    `;
-    container.appendChild(box);
-    document.getElementById('startBtn').onclick = startRound;
-    return;
-  }
-  if (gamePhase === 'finished') return;
-  const title = document.createElement('h2');
-  title.className = 'text-2xl font-bold text-gray-900 mb-4';
-  title.textContent = 'Digit Span Memory';
-  container.appendChild(title);
-  const box = document.createElement('div');
-  box.className = 'bg-white rounded-lg shadow-sm p-8 mb-6';
-  box.innerHTML = `
-    <div class="flex justify-between items-center mb-6">
-      <div>
-        <p class="text-sm text-gray-600">Round: ${round}/${maxRounds}</p>
-        <p class="text-sm text-gray-600">Score: ${score}</p>
-      </div>
-      <div class="text-right">
-        <p class="text-sm text-gray-600">Sequence Length: ${sequenceLength}</p>
-      </div>
-    </div>
-  `;
-  if (gamePhase === 'showing') {
-    const showDiv = document.createElement('div');
-    showDiv.className = 'mb-8';
-    showDiv.innerHTML = `<p class="text-lg text-gray-700 mb-6">Watch the sequence:</p>`;
-    const digitDiv = document.createElement('div');
-    digitDiv.className = 'h-32 flex items-center justify-center';
-    if (currentDigitIndex < currentSequence.length) {
-      digitDiv.innerHTML = `<div class="text-8xl font-bold text-blue-600 animate-pulse">${currentSequence[currentDigitIndex]}</div>`;
-    } else {
-      digitDiv.innerHTML = '<div class="text-2xl text-gray-500">Sequence complete</div>';
-    }
-    showDiv.appendChild(digitDiv);
-    const dots = document.createElement('div');
-    dots.className = 'flex justify-center space-x-2 mt-4';
-    for (let i = 0; i < currentSequence.length; i++) {
-      const dot = document.createElement('div');
-      dot.className = `w-3 h-3 rounded-full ${i <= currentDigitIndex ? 'bg-blue-600' : 'bg-gray-300'}`;
-      showDiv.appendChild(dot);
-    }
-    showDiv.appendChild(dots);
-    box.appendChild(showDiv);
-  }
-  if (gamePhase === 'input') {
-    const inputDiv = document.createElement('div');
-    inputDiv.className = 'mb-8';
-    inputDiv.innerHTML = `<p class="text-lg text-gray-700 mb-6">Click the numbers in the same order:</p>`;
-    const inputRow = document.createElement('div');
-    inputRow.className = 'flex justify-center space-x-2 mb-4';
-    for (let i = 0; i < userInput.length; i++) {
-      const d = document.createElement('div');
-      d.className = 'w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center text-xl font-bold text-blue-800';
-      d.textContent = userInput[i];
-      inputRow.appendChild(d);
-    }
-    for (let i = userInput.length; i < currentSequence.length; i++) {
-      const d = document.createElement('div');
-      d.className = 'w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center text-xl text-gray-400';
-      d.textContent = '?';
-      inputRow.appendChild(d);
-    }
-    inputDiv.appendChild(inputRow);
-    const grid = document.createElement('div');
-    grid.className = 'grid grid-cols-3 gap-4 max-w-xs mx-auto';
-    for (let digit = 1; digit <= 9; digit++) {
-      const btn = document.createElement('button');
-      btn.className = 'bg-gray-100 hover:bg-blue-200 text-xl font-bold rounded-lg p-4';
-      btn.textContent = digit;
-      btn.onclick = () => handleDigitClick(digit);
-      grid.appendChild(btn);
-    }
-    inputDiv.appendChild(grid);
-    box.appendChild(inputDiv);
-  }
-  if (gamePhase === 'feedback') {
-    const feedbackDiv = document.createElement('div');
-    feedbackDiv.className = `mb-6 p-3 rounded-lg text-lg font-semibold ${feedback.includes('Correct') ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`;
-    feedbackDiv.textContent = feedback;
-    box.appendChild(feedbackDiv);
-  }
-  container.appendChild(box);
-}
-function generateSequence() {
-  const sequence = [];
-  for (let i = 0; i < sequenceLength; i++) {
-    sequence.push(Math.floor(Math.random() * 9) + 1);
-  }
-  return sequence;
-}
-function startRound() {
-  currentSequence = generateSequence();
-  userInput = [];
-  currentDigitIndex = 0;
-  gamePhase = 'showing';
-  renderGame();
-  showNextDigit();
-}
-function showNextDigit() {
-  if (currentDigitIndex < currentSequence.length) {
-    setTimeout(() => {
-      currentDigitIndex++;
-      renderGame();
-      showNextDigit();
-    }, 1000);
-  } else {
-    setTimeout(() => {
-      gamePhase = 'input';
-      inputStartTime = Date.now();
-      renderGame();
-    }, 500);
-  }
-}
-function handleDigitClick(digit) {
-  userInput.push(digit);
-  renderGame();
-  if (userInput.length === currentSequence.length) {
-    const isCorrect = userInput.every((d, i) => d === currentSequence[i]);
-    const reactionTime = Date.now() - inputStartTime;
-    reactionTimes.push(reactionTime);
-    decisions.push({
-      round,
-      sequenceLength,
-      sequence: currentSequence.slice(),
-      userInput: userInput.slice(),
-      correct: isCorrect,
-      reactionTime
-    });
-    if (isCorrect) {
-      score += sequenceLength * 10;
-      consecutiveCorrect++;
-      consecutiveWrong = 0;
-      feedback = 'Correct! ✓';
-      if (consecutiveCorrect >= 2 && sequenceLength < 8) {
-        sequenceLength++;
-        consecutiveCorrect = 0;
-      }
-    } else {
-      consecutiveWrong++;
-      consecutiveCorrect = 0;
-      feedback = 'Incorrect. Try again!';
-      if (consecutiveWrong >= 2 && sequenceLength > 3) {
-        sequenceLength--;
-        consecutiveWrong = 0;
-      }
-    }
-    gamePhase = 'feedback';
-    renderGame();
-    setTimeout(() => {
-      if (round < maxRounds) {
-        round++;
-        startRound();
-      } else {
-        endGame();
-      }
-    }, 2000);
-  }
-}
-function endGame() {
-  gamePhase = 'finished';
-  document.getElementById('gameContainer').classList.add('hidden');
-  document.getElementById('gameOverContainer').classList.remove('hidden');
-  document.getElementById('finalScore').textContent = score;
-  const maxSpan = Math.max(...decisions.map(d => d.sequenceLength));
-  document.getElementById('finalMaxSpan').textContent = maxSpan;
-  const accuracy = decisions.filter(d => d.correct).length / decisions.length;
-  document.getElementById('finalAccuracy').textContent = Math.round(accuracy * 100) + '%';
-  document.getElementById('finalSpan').textContent = maxSpan;
-  saveGameResult(maxSpan, accuracy);
-}
-function saveGameResult(maxSpan, accuracy) {
-  const totalTime = Date.now() - startTime;
-  const gameData = {
-    game_type: 'digit_span',
-    score: Math.min(score, 100),
-    duration: totalTime,
-    decisions: decisions,
-    reaction_times: reactionTimes,
-    raw_data: {
-      finalScore: score,
-      accuracy: accuracy,
-      maxSpan: maxSpan,
-      averageReactionTime: reactionTimes.length ? reactionTimes.reduce((a, b) => a + b, 0) / reactionTimes.length : 0,
-      finalSequenceLength: sequenceLength
-    }
-  };
-  fetch('{% url "games:save_game_result" %}', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-    },
-    body: JSON.stringify(gameData)
-  })
-  .then(response => response.json())
-  .then(data => {
-    console.log('Game result saved:', data);
-  })
-  .catch(error => {
-    console.error('Error saving game result:', error);
-  });
-}
-document.addEventListener('DOMContentLoaded', function() {
-  renderGame();
+    // --- DOM Elements ---
+    const gameBody = document.querySelector('.game-body');
+    const { instructionModal, finalResultsModal, sequenceDisplay, inputArea, userInput, numpad, submitBtn, feedbackText } = {
+        instructionModal: document.getElementById('instruction-modal'),
+        finalResultsModal: document.getElementById('final-results-modal'),
+        sequenceDisplay: document.getElementById('sequence-display'),
+        inputArea: document.getElementById('input-area'),
+        userInput: document.getElementById('user-input'),
+        numpad: document.getElementById('numpad'),
+        submitBtn: document.getElementById('submit-btn'),
+        feedbackText: document.getElementById('feedback-text'),
+    };
+    const { taskTypeEl, currentSpanEl, maxSpanEl } = {
+        taskTypeEl: document.getElementById('task-type'),
+        currentSpanEl: document.getElementById('current-span'),
+        maxSpanEl: document.getElementById('max-span'),
+    };
+    const { startGameBtn, backToGamesBtn, returnToGamesFinalBtn } = {
+        startGameBtn: document.getElementById('start-game-btn'),
+        backToGamesBtn: document.getElementById('back-to-games-btn'),
+        returnToGamesFinalBtn: document.getElementById('return-to-games-final-btn'),
+    };
+
+    // --- GAME STATE ---
+    let state = {};
+    const resetState = () => {
+        state = {
+            taskType: 'forward',
+            currentSpan: STARTING_SPAN,
+            maxForwardSpan: 0,
+            maxBackwardSpan: 0,
+            incorrectStreak: 0,
+            currentSequence: '',
+            events: [],
+            gameStartTime: 0,
+            trialStartTime: 0,
+            gameCompleted: false,
+        };
+    };
+
+    // --- Core Game Logic ---
+    const startGame = () => {
+        resetState();
+        setupNumpad();
+        state.gameStartTime = Date.now();
+        instructionModal.style.display = 'none';
+        logEvent('game_start');
+        nextTrial();
+    };
+
+    const nextTrial = () => {
+        if (state.incorrectStreak >= MAX_INCORRECT_STREAK) {
+            if (state.taskType === 'forward') {
+                state.taskType = 'backward';
+                state.currentSpan = STARTING_SPAN;
+                state.incorrectStreak = 0;
+                logEvent('task_switch', { new_task: 'backward' });
+                feedbackText.textContent = 'Next up: Backward Span!';
+                setTimeout(nextTrial, FEEDBACK_DELAY_MS * 1.5);
+                return;
+            } else {
+                endGame(true);
+                return;
+            }
+        }
+
+        inputArea.style.display = 'none';
+        userInput.value = '';
+        feedbackText.textContent = '';
+        updateDashboard();
+
+        state.currentSequence = generateSequence(state.currentSpan);
+        state.trialStartTime = Date.now();
+        logEvent('trial_start', { task: state.taskType, span: state.currentSpan, sequence: state.currentSequence });
+        presentSequence();
+    };
+
+    const generateSequence = (length) => {
+        let seq = '';
+        for (let i = 0; i < length; i++) {
+            seq += Math.floor(Math.random() * 10);
+        }
+        return seq;
+    };
+
+    const presentSequence = async () => {
+        for (const digit of state.currentSequence) {
+            sequenceDisplay.textContent = digit;
+            await new Promise(resolve => setTimeout(resolve, PRESENTATION_SPEED_MS));
+            sequenceDisplay.textContent = '';
+            await new Promise(resolve => setTimeout(resolve, 200));
+        }
+        sequenceDisplay.textContent = '';
+        promptForInput();
+    };
+
+    const promptForInput = () => {
+        feedbackText.textContent = `Recall the sequence in ${state.taskType} order.`;
+        inputArea.style.display = 'block';
+    };
+
+    const handleSubmit = () => {
+        const reactionTime = Date.now() - state.trialStartTime;
+        const userResponse = userInput.value;
+        const correctResponse = state.taskType === 'forward' ? state.currentSequence : state.currentSequence.split('').reverse().join('');
+        const isCorrect = userResponse === correctResponse;
+
+        logEvent('trial_end', { response: userResponse, correct_response: correctResponse, is_correct: isCorrect, reaction_time: reactionTime });
+
+        if (isCorrect) {
+            feedbackText.textContent = 'Correct!';
+            feedbackText.style.color = 'var(--success-color)';
+            state.incorrectStreak = 0;
+            if (state.taskType === 'forward') state.maxForwardSpan = Math.max(state.maxForwardSpan, state.currentSpan);
+            else state.maxBackwardSpan = Math.max(state.maxBackwardSpan, state.currentSpan);
+            state.currentSpan++;
+        } else {
+            feedbackText.textContent = 'Incorrect.';
+            feedbackText.style.color = 'var(--danger-color)';
+            state.incorrectStreak++;
+        }
+        
+        setTimeout(nextTrial, FEEDBACK_DELAY_MS);
+    };
+
+    const endGame = (completed) => {
+        state.gameCompleted = completed;
+        displayFinalResults();
+        finalResultsModal.style.display = 'flex';
+        sendDataToBackend();
+    };
+
+    // --- UI & Helpers ---
+    const setupNumpad = () => {
+        numpad.innerHTML = '';
+        for (let i = 1; i <= 9; i++) {
+            const btn = document.createElement('button');
+            btn.textContent = i;
+            btn.addEventListener('click', () => userInput.value += i);
+            numpad.appendChild(btn);
+        }
+        const clearBtn = document.createElement('button');
+        clearBtn.innerHTML = '&larr;';
+        clearBtn.addEventListener('click', () => userInput.value = userInput.value.slice(0, -1));
+        numpad.appendChild(clearBtn);
+        const zeroBtn = document.createElement('button');
+        zeroBtn.textContent = '0';
+        zeroBtn.addEventListener('click', () => userInput.value += '0');
+        numpad.appendChild(zeroBtn);
+    };
+
+    const updateDashboard = () => {
+        taskTypeEl.textContent = state.taskType.charAt(0).toUpperCase() + state.taskType.slice(1);
+        currentSpanEl.textContent = state.currentSpan;
+        const maxSpan = state.taskType === 'forward' ? state.maxForwardSpan : state.maxBackwardSpan;
+        maxSpanEl.textContent = maxSpan > 0 ? maxSpan : '-';
+    };
+
+    const displayFinalResults = () => {
+        document.getElementById('final-summary').innerHTML = `
+            <div><strong>Max Forward Span:</strong></div><div style="color: var(--primary-color); font-weight: bold;">${state.maxForwardSpan}</div>
+            <div><strong>Max Backward Span:</strong></div><div style="color: var(--primary-color); font-weight: bold;">${state.maxBackwardSpan}</div>
+        `;
+    };
+
+    // --- Data Handling ---
+    const logEvent = (type, details = {}) => {
+        state.events.push({ type, timestamp: Date.now() - state.gameStartTime, ...details });
+    };
+
+    const sendDataToBackend = () => {
+        const completionStatus = state.gameCompleted ? 'completed' : 'abandoned';
+        const score = state.maxForwardSpan + state.maxBackwardSpan;
+        const data = {
+            game_name: GAME_ID,
+            score: score,
+            duration_ms: Date.now() - state.gameStartTime,
+            completion_status: completionStatus,
+            events: state.events,
+            game_specific_data: { max_forward_span: state.maxForwardSpan, max_backward_span: state.maxBackwardSpan }
+        };
+
+        return fetch('{% url "games:save_score" %}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': gameBody.dataset.csrfToken },
+            body: JSON.stringify(data),
+        });
+    };
+
+    const quitGame = () => {
+        if (state.gameStartTime === 0 || finalResultsModal.style.display === 'flex') {
+            window.location.href = gameBody.dataset.gameListUrl;
+            return;
+        }
+        state.gameCompleted = false;
+        sendDataToBackend().finally(() => window.location.href = gameBody.dataset.gameListUrl);
+    };
+
+    // --- Event Listeners ---
+    startGameBtn.addEventListener('click', startGame);
+    submitBtn.addEventListener('click', handleSubmit);
+    backToGamesBtn.addEventListener('click', (e) => { e.preventDefault(); quitGame(); });
+    returnToGamesFinalBtn.addEventListener('click', (e) => { e.preventDefault(); window.location.href = gameBody.dataset.gameListUrl; });
 });
 </script>
-
-{% csrf_token %}
-{% endblock %} 
+{% endblock %}

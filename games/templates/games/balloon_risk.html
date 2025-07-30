@@ -1,212 +1,304 @@
 {% extends 'base.html' %}
-
-{% block title %}Balloon Risk Game - Rasmetric{% endblock %}
-
+{% load static %}
 {% block content %}
-<div class="min-h-screen bg-gray-50">
-  <div class="max-w-4xl mx-auto px-4 py-8">
-    <button
-      onclick="window.location.href='{% url 'game_list' %}'"
-      class="flex items-center text-gray-600 hover:text-gray-900 mb-6"
-    >
-      <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-      </svg>
-      Back to Games
-    </button>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+<style>
+    :root {
+        --primary-color: #38BDF8; /* Light Blue 400 */
+        --success-color: #34D399; /* Green 400 */
+        --danger-color: #F87171; /* Red 400 */
+        --warning-color: #FBBF24; /* Amber 400 */
+        --background-color: #0F172A; /* Slate 900 */
+        --surface-color: #1E293B; /* Slate 800 */
+        --text-color: #F1F5F9; /* Slate 100 */
+        --muted-text-color: #94A3B8; /* Slate 400 */
+        --border-color: #334155; /* Slate 700 */
+    }
+    .game-body { background-color: var(--background-color); color: var(--text-color); font-family: 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 1rem; }
+    .game-container { background-color: var(--surface-color); border-radius: 12px; border: 1px solid var(--border-color); box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3); width: 100%; max-width: 800px; overflow: hidden; }
+    .game-header { background-color: rgba(0,0,0,0.2); padding: 1.5rem; text-align: center; border-bottom: 1px solid var(--border-color); }
+    .game-header h2 { font-size: 1.75rem; font-weight: bold; margin: 0; }
+    .dashboard { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; padding: 1.5rem; border-bottom: 1px solid var(--border-color); }
+    .stat-card { background-color: rgba(0,0,0,0.2); padding: 1rem; border-radius: 8px; text-align: center; }
+    .stat-card .value { font-size: 1.75rem; font-weight: bold; color: var(--primary-color); }
+    .stat-card .label { font-size: 0.8rem; color: var(--muted-text-color); text-transform: uppercase; font-weight: 600; }
+    .game-area { padding: 2rem; min-height: 400px; display: flex; flex-direction: column; justify-content: space-between; align-items: center; }
+    .balloon-wrapper { flex-grow: 1; display: flex; justify-content: center; align-items: center; width: 100%; margin-bottom: 2rem; }
+    #balloon { transition: transform 0.2s ease-out, filter 0.2s; cursor: pointer; }
+    #balloon.pumping { animation: pump-anim 0.3s ease-in-out; }
+    @keyframes pump-anim { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+    #balloon.burst { animation: burst-anim 0.5s forwards; }
+    @keyframes burst-anim { 0% { transform: scale(1), rotate(0deg); opacity: 1; } 100% { transform: scale(2.5) rotate(45deg); opacity: 0; } }
+    .game-controls { display: flex; gap: 1rem; width: 100%; justify-content: center; }
+    .btn { padding: 0.75rem 2rem; border: none; border-radius: 8px; font-size: 1rem; font-weight: bold; cursor: pointer; transition: all 0.2s; color: var(--text-color); display: flex; align-items: center; gap: 0.5rem; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    #pump-btn { background-color: var(--primary-color); }
+    #cash-out-btn { background-color: var(--success-color); }
+    .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); justify-content: center; align-items: center; }
+    .modal-content { background-color: var(--surface-color); padding: 2.5rem; border-radius: 12px; border: 1px solid var(--border-color); max-width: 500px; width: 90%; box-shadow: 0 5px 15px rgba(0,0,0,0.5); animation: modal-pop 0.3s ease-out; text-align: center; }
+    @keyframes modal-pop { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    #back-to-games-btn { position: absolute; top: 20px; left: 20px; background-color: rgba(0, 0, 0, 0.3); color: var(--text-color); padding: 0.5rem 1rem; border-radius: 8px; text-decoration: none; font-weight: bold; z-index: 10; }
+</style>
 
-    <div id="gameContainer" class="text-center">
-      <h2 class="text-2xl font-bold text-gray-900 mb-4">Balloon Risk Game</h2>
-      <div class="bg-white rounded-lg shadow-sm p-8 mb-6">
-        <div class="flex justify-between items-center mb-6">
-          <div>
-            <p class="text-sm text-gray-600">Round: <span id="roundDisplay">1</span>/10</p>
-            <p class="text-sm text-gray-600">Score: <span id="scoreDisplay">0</span></p>
-            <p class="text-sm text-gray-600">Pumps: <span id="pumpCountDisplay">0</span>/<span id="maxPumpsDisplay">30</span></p>
-          </div>
-          <div class="text-right">
-            <p class="text-sm text-gray-600">Size: <span id="balloonSizeDisplay">50</span></p>
-          </div>
+<div class="game-body" data-game-list-url="{% url 'games:game_list' %}" data-csrf-token="{{ csrf_token }}">
+    <a href="#" id="back-to-games-btn"><i class="fas fa-arrow-left"></i> Back to Games</a>
+
+    <div class="game-container">
+        <div class="game-header"><h2>Adaptive Risk Challenge</h2></div>
+        <div class="dashboard">
+            <div class="stat-card"><div id="total-winnings" class="value">$0</div><div class="label">Total Winnings</div></div>
+            <div class="stat-card"><div id="potential-winnings" class="value">$0</div><div class="label">Potential Gain</div></div>
+            <div class="stat-card"><div id="risk-level" class="value">Low</div><div class="label">Risk Level</div></div>
+            <div class="stat-card"><div id="round-counter" class="value">-</div><div class="label">Round</div></div>
         </div>
 
-        <div class="mb-8">
-          <div 
-            id="balloon"
-            class="mx-auto bg-red-400 rounded-full transition-all duration-300"
-            style="width: 50px; height: 50px; max-width: 200px; max-height: 200px;"
-          ></div>
+        <div class="game-area">
+            <div class="balloon-wrapper">
+                <svg id="balloon" viewBox="0 0 100 120" width="100">
+                    <defs>
+                        <radialGradient id="balloon-gradient" cx="30%" cy="30%" r="70%" fx="30%" fy="30%">
+                            <stop offset="0%" stop-color="#A3E635" />
+                            <stop offset="100%" stop-color="#4D7C0F" />
+                        </radialGradient>
+                    </defs>
+                    <path d="M50,115 C10,90 10,60 50,20 C90,60 90,90 50,115 Z" fill="url(#balloon-gradient)"/>
+                    <path d="M45,115 Q50,120 55,115" stroke="#334155" stroke-width="2" fill="none" />
+                </svg>
+            </div>
+            <div class="game-controls">
+                <button id="pump-btn" class="btn"><i class="fas fa-pump-soap"></i> Pump</button>
+                <button id="cash-out-btn" class="btn"><i class="fas fa-piggy-bank"></i> Cash Out</button>
+            </div>
         </div>
-
-        <div class="flex justify-center space-x-4">
-          <button
-            id="inflateButton"
-            onclick="inflateBalloon()"
-            class="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700"
-          >
-            Inflate (+10)
-          </button>
-          <button
-            id="cashOutButton"
-            onclick="cashOut()"
-            class="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700"
-          >
-            Cash Out (+<span id="cashOutValue">25</span>)
-          </button>
-        </div>
-      </div>
     </div>
 
-    <div id="gameOverContainer" class="text-center hidden">
-      <h2 class="text-2xl font-bold text-gray-900 mb-4">Game Complete!</h2>
-      <div class="bg-blue-50 rounded-lg p-6 mb-6">
-        <p class="text-lg text-gray-700 mb-2">Your Final Score: <span id="finalScore" class="font-bold text-blue-600">0</span></p>
-        <p class="text-sm text-gray-600">Rounds Completed: <span id="finalRounds">0</span></p>
-      </div>
-      <button
-        onclick="window.location.href='{% url 'game_list' %}'"
-        class="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700"
-      >
-        Continue
-      </button>
+    <!-- Modals -->
+    <div id="instruction-modal" class="modal" style="display: flex;">
+        <div class="modal-content">
+            <h3 style="font-size: 1.5rem; font-weight: bold; color: var(--primary-color);">Welcome to the Adaptive Risk Challenge!</h3>
+            <p style="margin: 1rem 0;">Your goal is to earn as much money as possible over 30 rounds. In each round, pump the balloon to increase its value. The more you pump, the more you can earn, but the risk of it bursting also increases. The game adapts to your playstyle. Cash out to secure your earnings before it pops!</p>
+            <button id="start-game-btn" class="btn">Start Game</button>
+        </div>
     </div>
-  </div>
+    <div id="final-results-modal" class="modal">
+        <div class="modal-content">
+            <h3 style="font-size: 1.5rem; font-weight: bold;">Challenge Complete!</h3>
+            <div id="final-summary" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem 1rem; text-align: left; margin: 1.5rem auto; width: fit-content;"></div>
+            <button id="return-to-games-final-btn" class="btn">Return to Games</button>
+        </div>
+    </div>
 </div>
 
 <script>
-let balloonSize = 50;
-let score = 0;
-let round = 1;
-let gameOver = false;
-let burstPoint = 0;
-let pumpCount = 0;
-const MAX_PUMPS = 15;
-const PUMP_SIZE = 10;
-let decisions = [];
-let reactionTimes = [];
-let startTime = Date.now();
-let roundStartTime = Date.now();
+document.addEventListener('DOMContentLoaded', () => {
+    // --- CONFIGURATION ---
+    const GAME_ID = 'balloon_risk';
+    const TOTAL_ROUNDS = 30;
+    const BASE_PUMP_VALUE = 5;
+    const INITIAL_BURST_PROBABILITY_GROWTH = 0.01;
+    const MIN_BURST_PROBABILITY_GROWTH = 0.005;
+    const MAX_BURST_PROBABILITY_GROWTH = 0.03;
+    const PROBABILITY_ADJUSTMENT_FACTOR = 0.001;
 
-function initGame() {
-  setBurstPoint();
-  updateDisplay();
-}
+    // --- DOM Elements ---
+    const gameBody = document.querySelector('.game-body');
+    const pumpBtn = document.getElementById('pump-btn');
+    const cashOutBtn = document.getElementById('cash-out-btn');
+    const balloon = document.getElementById('balloon');
+    const totalWinningsEl = document.getElementById('total-winnings');
+    const potentialWinningsEl = document.getElementById('potential-winnings');
+    const riskLevelEl = document.getElementById('risk-level');
+    const roundCounterEl = document.getElementById('round-counter');
+    const instructionModal = document.getElementById('instruction-modal');
+    const finalResultsModal = document.getElementById('final-results-modal');
+    const startGameBtn = document.getElementById('start-game-btn');
+    const returnToGamesFinalBtn = document.getElementById('return-to-games-final-btn');
+    const backToGamesBtn = document.getElementById('back-to-games-btn');
 
-function setBurstPoint() {
-  burstPoint = Math.floor(Math.random() * MAX_PUMPS) + 1;
-  pumpCount = 0;
-  balloonSize = 50;
-  roundStartTime = Date.now();
-}
+    // --- GAME STATE ---
+    let currentRound = 0;
+    let totalWinnings = 0;
+    let potentialWinnings = 0;
+    let pumpsThisRound = 0;
+    let burstProbability = 0;
+    let burstProbabilityGrowth = INITIAL_BURST_PROBABILITY_GROWTH;
+    let events = [];
+    let gameStartTime = 0;
+    let roundStartTime = 0;
+    let gameCompleted = false;
 
-function updateDisplay() {
-  document.getElementById('roundDisplay').textContent = round;
-  document.getElementById('scoreDisplay').textContent = score;
-  document.getElementById('pumpCountDisplay').textContent = pumpCount;
-  document.getElementById('maxPumpsDisplay').textContent = MAX_PUMPS;
-  document.getElementById('balloonSizeDisplay').textContent = balloonSize;
-  const balloon = document.getElementById('balloon');
-  balloon.style.width = balloonSize + 'px';
-  balloon.style.height = balloonSize + 'px';
-}
+    // --- Core Game Logic ---
+    const startGame = () => {
+        gameStartTime = Date.now();
+        instructionModal.style.display = 'none';
+        logEvent('game_start');
+        startRound();
+    };
 
-function inflateBalloon() {
-  const reactionTime = Date.now() - roundStartTime;
-  reactionTimes.push(reactionTime);
-  pumpCount += 1;
-  balloonSize = 50 + pumpCount * PUMP_SIZE;
-  updateDisplay();
-  if (pumpCount >= burstPoint) {
-    // Balloon bursts
-    decisions.push({
-      round: round,
-      action: 'inflate',
-      pumpCount: pumpCount,
-      burstPoint: burstPoint,
-      outcome: 'burst'
-    });
-    if (round >= 10) {
-      endGame();
-    } else {
-      round++;
-      setBurstPoint();
-      updateDisplay();
-    }
-  } else {
-    decisions.push({
-      round: round,
-      action: 'inflate',
-      pumpCount: pumpCount,
-      burstPoint: burstPoint,
-      outcome: 'continue'
-    });
-  }
-}
+    const startRound = () => {
+        currentRound++;
+        if (currentRound > TOTAL_ROUNDS) {
+            endGame(true);
+            return;
+        }
+        pumpsThisRound = 0;
+        potentialWinnings = 0;
+        burstProbability = 0;
+        roundStartTime = Date.now();
+        updateUI();
+        setControls(true);
+        balloon.style.transform = 'scale(1)';
+        balloon.classList.remove('burst');
+        logEvent('round_start');
+    };
 
-function cashOut() {
-  const reactionTime = Date.now() - roundStartTime;
-  reactionTimes.push(reactionTime);
-  const roundScore = pumpCount;
-  score += roundScore;
-  decisions.push({
-    round: round,
-    action: 'cash_out',
-    pumpCount: pumpCount,
-    burstPoint: burstPoint,
-    outcome: 'cash_out',
-    points: roundScore
-  });
-  if (round >= 10) {
-    endGame();
-  } else {
-    round++;
-    setBurstPoint();
-    updateDisplay();
-  }
-}
+    const pumpBalloon = () => {
+        pumpsThisRound++;
+        potentialWinnings += BASE_PUMP_VALUE;
+        burstProbability += burstProbabilityGrowth;
+        
+        balloon.style.transform = `scale(${1 + pumpsThisRound * 0.05})`;
+        balloon.classList.add('pumping');
+        setTimeout(() => balloon.classList.remove('pumping'), 200);
 
-function endGame() {
-  gameOver = true;
-  const totalTime = Date.now() - startTime;
-  document.getElementById('gameContainer').classList.add('hidden');
-  document.getElementById('gameOverContainer').classList.remove('hidden');
-  document.getElementById('finalScore').textContent = Math.min(score, 100);
-  document.getElementById('finalRounds').textContent = round;
-  saveGameResult(totalTime);
-}
+        logEvent('pump');
 
-function saveGameResult(totalTime) {
-  const gameData = {
-    game_type: 'balloon_risk',
-    score: Math.min(score, 100),
-    duration: totalTime,
-    decisions: decisions,
-    reaction_times: reactionTimes,
-    raw_data: {
-      total_rounds: round,
-      average_reaction_time: reactionTimes.reduce((a, b) => a + b, 0) / reactionTimes.length,
-      risk_tolerance: decisions.filter(d => d.action === 'inflate').length / decisions.length
-    }
-  };
-  fetch('{% url "games:save_game_result" %}', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-    },
-    body: JSON.stringify(gameData)
-  })
-  .then(response => response.json())
-  .then(data => {
-    console.log('Game result saved:', data);
-  })
-  .catch(error => {
-    console.error('Error saving game result:', error);
-  });
-}
-document.addEventListener('DOMContentLoaded', function() {
-  initGame();
+        if (Math.random() < burstProbability) {
+            handleBurst();
+        } else {
+            updateUI();
+        }
+    };
+
+    const cashOut = () => {
+        totalWinnings += potentialWinnings;
+        logEvent('cash_out');
+        // ADAPTIVE LOGIC: If player cashes out, slightly decrease risk for next round (encourage more pumps)
+        burstProbabilityGrowth = Math.max(MIN_BURST_PROBABILITY_GROWTH, burstProbabilityGrowth - PROBABILITY_ADJUSTMENT_FACTOR);
+        setControls(false);
+        setTimeout(startRound, 1000);
+    };
+
+    const handleBurst = () => {
+        potentialWinnings = 0;
+        logEvent('burst');
+        // ADAPTIVE LOGIC: If balloon bursts, slightly increase risk for next round (discourage risky behavior)
+        burstProbabilityGrowth = Math.min(MAX_BURST_PROBABILITY_GROWTH, burstProbabilityGrowth + PROBABILITY_ADJUSTMENT_FACTOR * 2);
+        setControls(false);
+        balloon.classList.add('burst');
+        setTimeout(startRound, 1500);
+    };
+
+    const endGame = (completed) => {
+        gameCompleted = completed;
+        setControls(false);
+        displayFinalResults();
+        finalResultsModal.style.display = 'flex';
+        sendDataToBackend();
+    };
+
+    // --- UI & Controls ---
+    const updateUI = () => {
+        totalWinningsEl.textContent = `$${totalWinnings}`;
+        potentialWinningsEl.textContent = `$${potentialWinnings}`;
+        roundCounterEl.textContent = `${currentRound}/${TOTAL_ROUNDS}`;
+        
+        if (burstProbability < 0.33) riskLevelEl.textContent = 'Low';
+        else if (burstProbability < 0.66) riskLevelEl.textContent = 'Medium';
+        else riskLevelEl.textContent = 'High';
+        riskLevelEl.style.color = burstProbability < 0.33 ? 'var(--success-color)' : (burstProbability < 0.66 ? 'var(--warning-color)' : 'var(--danger-color)');
+
+        cashOutBtn.disabled = pumpsThisRound === 0;
+    };
+
+    const setControls = (enabled) => {
+        pumpBtn.disabled = !enabled;
+        cashOutBtn.disabled = !enabled || pumpsThisRound === 0;
+    };
+
+    const displayFinalResults = () => {
+        const totalPumps = events.filter(e => e.action === 'pump').length;
+        const totalBursts = events.filter(e => e.action === 'burst').length;
+        const totalCashedOut = events.filter(e => e.action === 'cash_out').length;
+        const avgPumpsPerRound = totalCashedOut > 0 ? (events.filter(e => e.action === 'pump' && e.potential_winnings > 0).length / totalCashedOut) : 0;
+
+        const summaryEl = document.getElementById('final-summary');
+        summaryEl.innerHTML = `
+            <div><strong>Total Winnings:</strong></div><div style="color: var(--success-color); font-weight: bold;">$${totalWinnings}</div>
+            <div><strong>Rounds Played:</strong></div><div>${currentRound - 1}/${TOTAL_ROUNDS}</div>
+            <div><strong>Balloons Popped:</strong></div><div>${totalBursts}</div>
+            <div><strong>Successful Cash-outs:</strong></div><div>${totalCashedOut}</div>
+            <div><strong>Avg. Pumps (Cashed Out):</strong></div><div>${avgPumpsPerRound.toFixed(2)}</div>
+        `;
+    };
+
+    // --- Data Handling ---
+    const logEvent = (action) => {
+        const event = {
+            round: currentRound,
+            action: action,
+            pumps_this_round: pumpsThisRound,
+            potential_winnings: potentialWinnings,
+            total_winnings: totalWinnings,
+            burst_probability: burstProbability.toFixed(4),
+            burst_probability_growth: burstProbabilityGrowth.toFixed(4),
+            timestamp: Date.now() - gameStartTime,
+        };
+        events.push(event);
+    };
+
+    const sendDataToBackend = () => {
+        const completionStatus = gameCompleted ? 'completed' : 'abandoned';
+        const totalDuration = Date.now() - gameStartTime;
+        const totalPumps = events.filter(e => e.action === 'pump').length;
+        const totalBursts = events.filter(e => e.action === 'burst').length;
+
+        const data = {
+            game_name: GAME_ID,
+            score: totalWinnings,
+            duration_ms: totalDuration,
+            completion_status: completionStatus,
+            events: events,
+            game_specific_data: {
+                total_pumps: totalPumps,
+                total_bursts: totalBursts,
+                total_cash_outs: events.filter(e => e.action === 'cash_out').length,
+                final_burst_probability_growth: burstProbabilityGrowth,
+                avg_pumps_per_round: totalPumps / (currentRound > 1 ? currentRound - 1 : 1)
+            }
+        };
+
+        return fetch('{% url "games:save_score" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': gameBody.dataset.csrfToken,
+            },
+            body: JSON.stringify(data),
+        });
+    };
+
+    const quitGame = () => {
+        if (gameStartTime === 0) {
+            window.location.href = gameBody.dataset.gameListUrl;
+            return;
+        }
+        if (finalResultsModal.style.display === 'flex') {
+             window.location.href = gameBody.dataset.gameListUrl;
+             return;
+        }
+        gameCompleted = false;
+        sendDataToBackend().finally(() => {
+            window.location.href = gameBody.dataset.gameListUrl;
+        });
+    };
+
+    // --- Event Listeners ---
+    startGameBtn.addEventListener('click', startGame);
+    pumpBtn.addEventListener('click', pumpBalloon);
+    cashOutBtn.addEventListener('click', cashOut);
+    backToGamesBtn.addEventListener('click', (e) => { e.preventDefault(); quitGame(); });
+    returnToGamesFinalBtn.addEventListener('click', (e) => { e.preventDefault(); window.location.href = gameBody.dataset.gameListUrl; });
 });
 </script>
-
-{% csrf_token %}
-{% endblock %} 
+{% endblock %}

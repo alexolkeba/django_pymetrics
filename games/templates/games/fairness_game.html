@@ -1,264 +1,297 @@
 {% extends 'base.html' %}
-
-{% block title %}Fairness Game - Rasmetric{% endblock %}
-
+{% load static %}
 {% block content %}
-<div class="min-h-screen bg-gray-50">
-  <div class="max-w-4xl mx-auto px-4 py-8">
-    <button
-      onclick="window.location.href='{% url 'game_list' %}'"
-      class="flex items-center text-gray-600 hover:text-gray-900 mb-6"
-    >
-      <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-      </svg>
-      Back to Games
-    </button>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+<style>
+    :root {
+        --primary-color: #60A5FA; /* Blue 400 */
+        --success-color: #34D399; /* Green 400 */
+        --danger-color: #F87171; /* Red 400 */
+        --warning-color: #FBBF24; /* Amber 400 */
+        --background-color: #0F172A; /* Slate 900 */
+        --surface-color: #1E293B; /* Slate 800 */
+        --text-color: #F1F5F9; /* Slate 100 */
+        --muted-text-color: #94A3B8; /* Slate 400 */
+        --border-color: #334155; /* Slate 700 */
+    }
+    .game-body { background-color: var(--background-color); color: var(--text-color); font-family: 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 1rem; }
+    .game-container { background-color: var(--surface-color); border-radius: 12px; border: 1px solid var(--border-color); box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3); width: 100%; max-width: 800px; overflow: hidden; }
+    .game-header { background-color: rgba(0,0,0,0.2); padding: 1.5rem; text-align: center; border-bottom: 1px solid var(--border-color); }
+    .game-header h2 { font-size: 1.75rem; font-weight: bold; margin: 0; }
+    .dashboard { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; padding: 1.5rem; border-bottom: 1px solid var(--border-color); }
+    .stat-card { background-color: rgba(0,0,0,0.2); padding: 1rem; border-radius: 8px; text-align: center; }
+    .stat-card .value { font-size: 1.75rem; font-weight: bold; color: var(--primary-color); }
+    .stat-card .label { font-size: 0.8rem; color: var(--muted-text-color); text-transform: uppercase; font-weight: 600; }
+    .game-area { padding: 2rem; min-height: 350px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+    .offer-section, .response-section { width: 100%; }
+    .offer-text { font-size: 1.25rem; margin-bottom: 1.5rem; }
+    .slider-container { margin: 1rem 0; }
+    input[type="range"] { width: 80%; }
+    .game-controls { display: flex; gap: 1rem; justify-content: center; margin-top: 1.5rem; }
+    .btn { padding: 0.75rem 2rem; border: none; border-radius: 8px; font-size: 1rem; font-weight: bold; cursor: pointer; transition: all 0.2s; color: var(--text-color); display: flex; align-items: center; gap: 0.5rem; }
+    #accept-btn, #submit-offer-btn { background-color: var(--success-color); }
+    #reject-btn { background-color: var(--danger-color); }
+    .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); justify-content: center; align-items: center; }
+    .modal-content { background-color: var(--surface-color); padding: 2.5rem; border-radius: 12px; border: 1px solid var(--border-color); max-width: 500px; width: 90%; box-shadow: 0 5px 15px rgba(0,0,0,0.5); animation: modal-pop 0.3s ease-out; text-align: center; }
+    @keyframes modal-pop { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    #back-to-games-btn { position: absolute; top: 20px; left: 20px; background-color: rgba(0, 0, 0, 0.3); color: var(--text-color); padding: 0.5rem 1rem; border-radius: 8px; text-decoration: none; font-weight: bold; z-index: 10; }
+</style>
 
-    <div id="gameContainer" class="text-center">
-      <h2 class="text-2xl font-bold text-gray-900 mb-4">Fairness Allocation</h2>
-      <div class="bg-white rounded-lg shadow-sm p-8 mb-6">
-        <div class="flex justify-between items-center mb-6">
-          <div>
-            <p class="text-sm text-gray-600">Round: <span id="roundDisplay">1</span>/10</p>
-          </div>
-          <div class="text-right">
-            <p class="text-sm text-gray-600">Resources: <span id="allocatedDisplay">0</span>/<span id="totalResourcesDisplay">0</span></p>
-          </div>
+<div class="game-body" data-game-list-url="{% url 'games:game_list' %}" data-csrf-token="{{ csrf_token }}">
+    <a href="#" id="back-to-games-btn"><i class="fas fa-arrow-left"></i> Back to Games</a>
+
+    <div class="game-container">
+        <div class="game-header"><h2>Economic Fairness Challenge</h2></div>
+        <div class="dashboard">
+            <div class="stat-card"><div id="total-winnings" class="value">$0</div><div class="label">Your Winnings</div></div>
+            <div class="stat-card"><div id="partner-type" class="value">-</div><div class="label">Partner Profile</div></div>
+            <div class="stat-card"><div id="round-counter" class="value">-</div><div class="label">Round</div></div>
         </div>
-        <div id="scenarioContainer" class="mb-8"></div>
-        <div id="groupsContainer" class="space-y-6"></div>
-        <div class="mt-6">
-          <button
-            id="submitButton"
-            onclick="submitAllocation()"
-            class="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700"
-          >
-            Submit Allocation
-          </button>
+
+        <div class="game-area">
+            <div id="proposer-view" style="display: none;">
+                <p class="offer-text">You have <strong>$10</strong>. How much will you offer to your partner?</p>
+                <div class="slider-container">
+                    <input type="range" id="offer-slider" min="0" max="10" step="1" value="5">
+                    <p>Your Offer: <strong id="offer-amount">$5</strong></p>
+                </div>
+                <div class="game-controls"><button id="submit-offer-btn" class="btn">Submit Offer</button></div>
+            </div>
+
+            <div id="responder-view" style="display: none;">
+                <p class="offer-text">Your partner has offered you <strong id="received-offer">$0</strong> out of $10.</p>
+                <div class="game-controls">
+                    <button id="accept-btn" class="btn"><i class="fas fa-check"></i> Accept</button>
+                    <button id="reject-btn" class="btn"><i class="fas fa-times"></i> Reject</button>
+                </div>
+            </div>
+
+            <div id="round-result-view" style="display: none;">
+                <p id="round-result-text" style="font-size: 1.25rem;"></p>
+            </div>
         </div>
-      </div>
     </div>
 
-    <div id="resultContainer" class="text-center hidden">
-      <h2 class="text-2xl font-bold text-gray-900 mb-4">Fairness Assessment Complete!</h2>
-      <div class="bg-blue-50 rounded-lg p-6 mb-6">
-        <p class="text-lg text-gray-700 mb-2">Average Equity Score: <span id="finalEquity" class="font-bold text-blue-600">0</span></p>
-        <p class="text-lg text-gray-700 mb-2">Scenarios Completed: <span id="finalRounds" class="font-bold text-green-600">10</span></p>
-        <p class="text-sm text-gray-600">Fairness & Ethics Rating: <span id="finalEquityPercent">0</span>%</p>
-      </div>
-      <button
-        onclick="window.location.href='{% url 'game_list' %}'"
-        class="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700"
-      >
-        Continue
-      </button>
+    <!-- Modals -->
+    <div id="instruction-modal" class="modal" style="display: flex;">
+        <div class="modal-content">
+            <h3 style="font-size: 1.5rem; font-weight: bold; color: var(--primary-color);">Welcome to the Economic Fairness Challenge!</h3>
+            <p style="margin: 1rem 0;">You will play 15 rounds with a partner. In each round, one of you will be the Proposer and the other the Responder. The Proposer offers a split of $10. If the Responder accepts, you both get the money. If they reject, you both get nothing. Your partner's behavior may change. Your goal is to maximize your earnings.</p>
+            <button id="start-game-btn" class="btn">Start Challenge</button>
+        </div>
     </div>
-  </div>
+    <div id="final-results-modal" class="modal">
+        <div class="modal-content">
+            <h3 style="font-size: 1.5rem; font-weight: bold;">Challenge Complete!</h3>
+            <div id="final-summary" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem 1rem; text-align: left; margin: 1.5rem auto; width: fit-content;"></div>
+            <button id="return-to-games-final-btn" class="btn">Return to Games</button>
+        </div>
+    </div>
 </div>
 
 <script>
-const scenarios = [
-  {
-    id: 1,
-    title: 'Food Distribution',
-    description: 'Distribute food supplies among different communities',
-    totalResources: 100,
-    groups: [
-      { name: 'Urban Community', size: 50, need: 0.8, description: 'Limited access to fresh food' },
-      { name: 'Rural Village', size: 30, need: 0.9, description: 'Drought affected area' },
-      { name: 'Refugee Camp', size: 20, need: 1.0, description: 'Emergency situation' }
-    ]
-  },
-  {
-    id: 2,
-    title: 'Medical Supplies',
-    description: 'Allocate medical equipment to hospitals',
-    totalResources: 80,
-    groups: [
-      { name: 'City Hospital', size: 100, need: 0.7, description: 'Well-equipped but high demand' },
-      { name: 'Rural Clinic', size: 25, need: 0.9, description: 'Limited resources' },
-      { name: 'Emergency Center', size: 40, need: 0.8, description: 'Critical care facility' }
-    ]
-  },
-  {
-    id: 3,
-    title: 'Educational Resources',
-    description: 'Distribute learning materials to schools',
-    totalResources: 120,
-    groups: [
-      { name: 'Public School', size: 200, need: 0.6, description: 'Large student body' },
-      { name: 'Special Needs School', size: 30, need: 1.0, description: 'Requires specialized materials' },
-      { name: 'Remote School', size: 50, need: 0.8, description: 'Limited access to resources' }
-    ]
-  }
-];
-let round = 1;
-const totalRounds = 10;
-let currentScenario = null;
-let allocations = {};
-let gameOver = false;
-let startTime = Date.now();
-let roundStartTime = Date.now();
-let decisions = [];
-let reactionTimes = [];
+document.addEventListener('DOMContentLoaded', () => {
+    // --- CONFIGURATION ---
+    const GAME_ID = 'fairness_game';
+    const TOTAL_ROUNDS = 15;
+    const PARTNER_PROFILES = {
+        FAIR: { name: 'Consistent', rejection_threshold: 3 }, // Rejects offers < $3
+        UNFAIR: { name: 'Demanding', rejection_threshold: 5 }, // Rejects offers < $5
+        STRATEGIC: { name: 'Pragmatic', rejection_threshold: 1 }, // Accepts almost anything
+    };
 
-function generateScenario() {
-  currentScenario = scenarios[Math.floor(Math.random() * scenarios.length)];
-  allocations = {};
-  currentScenario.groups.forEach(group => {
-    allocations[group.name] = 0;
-  });
-  document.getElementById('totalResourcesDisplay').textContent = currentScenario.totalResources;
-  document.getElementById('allocatedDisplay').textContent = 0;
-  document.getElementById('roundDisplay').textContent = round;
-  renderScenario();
-  renderGroups();
-  roundStartTime = Date.now();
-}
+    // --- DOM Elements ---
+    const gameBody = document.querySelector('.game-body');
+    const { proposerView, responderView, roundResultView, instructionModal, finalResultsModal } = {
+        proposerView: document.getElementById('proposer-view'),
+        responderView: document.getElementById('responder-view'),
+        roundResultView: document.getElementById('round-result-view'),
+        instructionModal: document.getElementById('instruction-modal'),
+        finalResultsModal: document.getElementById('final-results-modal'),
+    };
+    const { totalWinningsEl, partnerTypeEl, roundCounterEl, offerSlider, offerAmountEl, receivedOfferEl } = {
+        totalWinningsEl: document.getElementById('total-winnings'),
+        partnerTypeEl: document.getElementById('partner-type'),
+        roundCounterEl: document.getElementById('round-counter'),
+        offerSlider: document.getElementById('offer-slider'),
+        offerAmountEl: document.getElementById('offer-amount'),
+        receivedOfferEl: document.getElementById('received-offer'),
+    };
+    const { startGameBtn, submitOfferBtn, acceptBtn, rejectBtn, backToGamesBtn, returnToGamesFinalBtn } = {
+        startGameBtn: document.getElementById('start-game-btn'),
+        submitOfferBtn: document.getElementById('submit-offer-btn'),
+        acceptBtn: document.getElementById('accept-btn'),
+        rejectBtn: document.getElementById('reject-btn'),
+        backToGamesBtn: document.getElementById('back-to-games-btn'),
+        returnToGamesFinalBtn: document.getElementById('return-to-games-final-btn'),
+    };
 
-function renderScenario() {
-  const scenarioContainer = document.getElementById('scenarioContainer');
-  scenarioContainer.innerHTML = `
-    <div class="bg-gray-50 rounded-lg p-6 mb-6">
-      <h3 class="text-xl font-semibold text-gray-900 mb-2">${currentScenario.title}</h3>
-      <p class="text-gray-700 mb-4">${currentScenario.description}</p>
-      <p class="text-sm text-gray-600">Total resources available: ${currentScenario.totalResources} units</p>
-    </div>
-  `;
-}
+    // --- GAME STATE ---
+    let state = {};
+    const resetState = () => {
+        state = {
+            currentRound: 0,
+            totalWinnings: 0,
+            partnerProfile: PARTNER_PROFILES.FAIR,
+            events: [],
+            gameStartTime: 0,
+            roundStartTime: 0,
+            gameCompleted: false,
+        };
+    };
 
-function renderGroups() {
-  const groupsContainer = document.getElementById('groupsContainer');
-  groupsContainer.innerHTML = '';
-  currentScenario.groups.forEach(group => {
-    const groupDiv = document.createElement('div');
-    groupDiv.className = 'bg-blue-50 rounded-lg p-4 mb-4';
-    groupDiv.innerHTML = `
-      <div class="flex justify-between items-start mb-3">
-        <div class="text-left">
-          <h4 class="font-semibold text-gray-900">${group.name}</h4>
-          <p class="text-sm text-gray-600">${group.description}</p>
-          <p class="text-xs text-gray-500">Size: ${group.size} people | Need level: ${Math.round(group.need * 100)}%</p>
-        </div>
-      </div>
-      <div class="flex items-center space-x-4">
-        <label class="text-sm font-medium text-gray-700">Allocate:</label>
-        <input type="range" min="0" max="${currentScenario.totalResources}" value="${allocations[group.name]}" oninput="handleAllocationChange('${group.name}', this.value)" class="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer" id="slider_${group.name}" />
-        <span class="text-sm font-bold text-blue-600 w-12 transition-colors duration-200" id="allocationDisplay_${group.name}">${allocations[group.name]}</span>
-      </div>
-    `;
-    groupsContainer.appendChild(groupDiv);
-    // Set initial slider color
-    setSliderColor(`slider_${group.name}`, allocations[group.name], currentScenario.totalResources);
-  });
-}
+    // --- Core Game Logic ---
+    const startGame = () => {
+        resetState();
+        state.gameStartTime = Date.now();
+        instructionModal.style.display = 'none';
+        logEvent('game_start');
+        startRound();
+    };
 
-function setSliderColor(sliderId, value, max) {
-  const slider = document.getElementById(sliderId);
-  if (!slider) return;
-  const percent = (value / max) * 100;
-  slider.style.background = `linear-gradient(to right, #16a34a 0%, #16a34a ${percent}%, #e5e7eb ${percent}%, #e5e7eb 100%)`;
-}
+    const startRound = () => {
+        state.currentRound++;
+        if (state.currentRound > TOTAL_ROUNDS) {
+            endGame(true);
+            return;
+        }
+        // Change partner profile every 5 rounds
+        if (state.currentRound === 6) state.partnerProfile = PARTNER_PROFILES.UNFAIR;
+        if (state.currentRound === 11) state.partnerProfile = PARTNER_PROFILES.STRATEGIC;
 
-function handleAllocationChange(groupName, value) {
-  allocations[groupName] = parseInt(value);
-  const display = document.getElementById(`allocationDisplay_${groupName}`);
-  display.textContent = value;
-  display.style.color = '#16a34a'; // green-600
-  document.getElementById('allocatedDisplay').textContent = getTotalAllocated();
-  setSliderColor(`slider_${groupName}`, value, currentScenario.totalResources);
-  setTimeout(() => {
-    display.style.color = '';
-  }, 400);
-}
+        state.roundStartTime = Date.now();
+        updateDashboard();
+        const isProposer = Math.random() < 0.5;
+        logEvent('round_start', { role: isProposer ? 'proposer' : 'responder', partner_profile: state.partnerProfile.name });
 
-function getTotalAllocated() {
-  return Object.values(allocations).reduce((sum, val) => sum + val, 0);
-}
+        if (isProposer) {
+            showView(proposerView);
+        } else {
+            const partnerOffer = generatePartnerOffer();
+            receivedOfferEl.textContent = `$${partnerOffer}`;
+            logEvent('offer_received', { offer: partnerOffer });
+            showView(responderView);
+        }
+    };
 
-function submitAllocation() {
-  if (!currentScenario) return;
-  const reactionTime = Date.now() - roundStartTime;
-  reactionTimes.push(reactionTime);
-  const totalAllocated = getTotalAllocated();
-  const fairnessScores = currentScenario.groups.map(group => {
-    const allocated = allocations[group.name];
-    const needed = group.size * group.need;
-    const fairnessRatio = allocated / needed;
-    return { group: group.name, fairnessRatio, allocated, needed };
-  });
-  const fairnessRatios = fairnessScores.map(s => s.fairnessRatio);
-  const averageFairness = fairnessRatios.reduce((a, b) => a + b, 0) / fairnessRatios.length;
-  const fairnessVariance = fairnessRatios.reduce((sum, ratio) => sum + Math.pow(ratio - averageFairness, 2), 0) / fairnessRatios.length;
-  const equityScore = Math.max(0, 100 - (fairnessVariance * 100));
-  decisions.push({
-    round,
-    scenarioId: currentScenario.id,
-    scenarioTitle: currentScenario.title,
-    totalResources: currentScenario.totalResources,
-    allocations: { ...allocations },
-    totalAllocated,
-    fairnessScores,
-    averageFairness,
-    equityScore,
-    reactionTime
-  });
-  if (round < totalRounds) {
-    round++;
-    generateScenario();
-  } else {
-    endGame();
-  }
-}
+    const generatePartnerOffer = () => {
+        // Partner AI logic
+        switch(state.partnerProfile.name) {
+            case 'Consistent': return Math.random() < 0.8 ? 5 : 4; // Mostly fair
+            case 'Demanding': return Math.random() < 0.8 ? 2 : 3; // Mostly unfair
+            case 'Pragmatic': return Math.floor(Math.random() * 5) + 1; // Random low offers
+            default: return 5;
+        }
+    };
 
-function endGame() {
-  gameOver = true;
-  const totalTime = Date.now() - startTime;
-  const averageEquity = decisions.reduce((sum, d) => sum + d.equityScore, 0) / decisions.length;
-  document.getElementById('gameContainer').classList.add('hidden');
-  document.getElementById('resultContainer').classList.remove('hidden');
-  document.getElementById('finalEquity').textContent = Math.round(averageEquity);
-  document.getElementById('finalRounds').textContent = totalRounds;
-  document.getElementById('finalEquityPercent').textContent = Math.round(averageEquity);
-  saveGameResult(totalTime, averageEquity);
-}
+    const handleOfferSubmit = () => {
+        const offer = parseInt(offerSlider.value);
+        const reactionTime = Date.now() - state.roundStartTime;
+        logEvent('offer_made', { offer: offer, reaction_time: reactionTime });
 
-function saveGameResult(totalTime, averageEquity) {
-  const gameData = {
-    game_type: 'fairness_game',
-    score: Math.round(averageEquity),
-    duration: totalTime,
-    decisions: decisions,
-    reaction_times: reactionTimes,
-    raw_data: {
-      averageEquityScore: averageEquity,
-      averageReactionTime: reactionTimes.reduce((a, b) => a + b, 0) / reactionTimes.length,
-      fairnessConsistency: 100 - (decisions.reduce((sum, d) => sum + Math.abs(d.equityScore - averageEquity), 0) / decisions.length),
-      resourceUtilization: decisions.reduce((sum, d) => sum + (d.totalAllocated / d.totalResources), 0) / decisions.length
-    }
-  };
-  fetch('{% url "games:save_game_result" %}', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-    },
-    body: JSON.stringify(gameData)
-  })
-  .then(response => response.json())
-  .then(data => {
-    console.log('Game result saved:', data);
-  })
-  .catch(error => {
-    console.error('Error saving game result:', error);
-  });
-}
+        const accepted = offer >= state.partnerProfile.rejection_threshold;
+        const earnings = accepted ? 10 - offer : 0;
+        state.totalWinnings += earnings;
 
-document.addEventListener('DOMContentLoaded', function() {
-  generateScenario();
+        logEvent('round_end', { result: accepted ? 'accepted' : 'rejected', earnings: earnings });
+        showRoundResult(`Your partner ${accepted ? 'accepted' : 'rejected'} your offer of $${offer}. You earned $${earnings}.`);
+    };
+
+    const handleResponse = (accepted) => {
+        const offer = parseInt(receivedOfferEl.textContent.slice(1));
+        const reactionTime = Date.now() - state.roundStartTime;
+        logEvent('response_made', { offer: offer, response: accepted ? 'accepted' : 'rejected', reaction_time: reactionTime });
+
+        const earnings = accepted ? offer : 0;
+        state.totalWinnings += earnings;
+
+        logEvent('round_end', { result: accepted ? 'accepted' : 'rejected', earnings: earnings });
+        showRoundResult(`You ${accepted ? 'accepted' : 'rejected'} the offer of $${offer}. You earned $${earnings}.`);
+    };
+
+    const showRoundResult = (text) => {
+        document.getElementById('round-result-text').textContent = text;
+        showView(roundResultView);
+        setTimeout(() => {
+            showView(null); // Hide all views
+            startRound();
+        }, 2500);
+    };
+
+    const endGame = (completed) => {
+        state.gameCompleted = completed;
+        displayFinalResults();
+        finalResultsModal.style.display = 'flex';
+        sendDataToBackend();
+    };
+
+    // --- UI & Helpers ---
+    const updateDashboard = () => {
+        totalWinningsEl.textContent = `$${state.totalWinnings}`;
+        partnerTypeEl.textContent = state.partnerProfile.name;
+        roundCounterEl.textContent = `${state.currentRound}/${TOTAL_ROUNDS}`;
+    };
+
+    const showView = (viewToShow) => {
+        [proposerView, responderView, roundResultView].forEach(v => v.style.display = 'none');
+        if (viewToShow) viewToShow.style.display = 'block';
+    };
+
+    const displayFinalResults = () => {
+        const offersMade = state.events.filter(e => e.type === 'offer_made').map(e => e.offer);
+        const offersReceived = state.events.filter(e => e.type === 'offer_received').map(e => e.offer);
+        const acceptedCount = state.events.filter(e => e.type === 'response_made' && e.response === 'accepted').length;
+        const rejectedCount = state.events.filter(e => e.type === 'response_made' && e.response === 'rejected').length;
+        
+        document.getElementById('final-summary').innerHTML = `
+            <div><strong>Total Winnings:</strong></div><div style="color: var(--success-color); font-weight: bold;">$${state.totalWinnings}</div>
+            <div><strong>Avg. Offer Made:</strong></div><div>$${(offersMade.reduce((a, b) => a + b, 0) / (offersMade.length || 1)).toFixed(2)}</div>
+            <div><strong>Avg. Offer Received:</strong></div><div>$${(offersReceived.reduce((a, b) => a + b, 0) / (offersReceived.length || 1)).toFixed(2)}</div>
+            <div><strong>Offers Accepted:</strong></div><div>${acceptedCount}</div>
+            <div><strong>Offers Rejected:</strong></div><div>${rejectedCount}</div>
+        `;
+    };
+
+    // --- Data Handling ---
+    const logEvent = (type, details = {}) => {
+        state.events.push({ type, round: state.currentRound, timestamp: Date.now() - state.gameStartTime, ...details });
+    };
+
+    const sendDataToBackend = () => {
+        const completionStatus = state.gameCompleted ? 'completed' : 'abandoned';
+        const data = {
+            game_name: GAME_ID,
+            score: state.totalWinnings,
+            duration_ms: Date.now() - state.gameStartTime,
+            completion_status: completionStatus,
+            events: state.events,
+            game_specific_data: { total_winnings: state.totalWinnings }
+        };
+
+        return fetch('{% url "games:save_score" %}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': gameBody.dataset.csrfToken },
+            body: JSON.stringify(data),
+        });
+    };
+
+    const quitGame = () => {
+        if (state.gameStartTime === 0 || finalResultsModal.style.display === 'flex') {
+            window.location.href = gameBody.dataset.gameListUrl;
+            return;
+        }
+        state.gameCompleted = false;
+        sendDataToBackend().finally(() => window.location.href = gameBody.dataset.gameListUrl);
+    };
+
+    // --- Event Listeners ---
+    startGameBtn.addEventListener('click', startGame);
+    offerSlider.addEventListener('input', (e) => offerAmountEl.textContent = `$${e.target.value}`);
+    submitOfferBtn.addEventListener('click', handleOfferSubmit);
+    acceptBtn.addEventListener('click', () => handleResponse(true));
+    rejectBtn.addEventListener('click', () => handleResponse(false));
+    backToGamesBtn.addEventListener('click', (e) => { e.preventDefault(); quitGame(); });
+    returnToGamesFinalBtn.addEventListener('click', (e) => { e.preventDefault(); window.location.href = gameBody.dataset.gameListUrl; });
 });
 </script>
-
-{% csrf_token %}
-{% endblock %} 
+{% endblock %}

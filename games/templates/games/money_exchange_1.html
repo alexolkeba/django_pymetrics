@@ -1,33 +1,162 @@
 {% extends 'base.html' %}
 {% block content %}
-<div class="max-w-lg mx-auto mt-4">
+<div class="max-w-4xl mx-auto mt-4">
     <button id="back-to-games" class="inline-block mb-4 px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300">← Back to Games</button>
 </div>
-<div class="game-container max-w-lg mx-auto mt-8 p-6 bg-white rounded shadow">
-    <h2 class="text-2xl font-bold mb-2">Money Exchange Game #1</h2>
-    <p class="mb-4">Decide how much money to send to your partner each round. Your partner will return a portion. Try to maximize your total earnings over <span id="total-rounds">5</span> rounds.</p>
-    <div id="game-area">
-        <div id="round-info" class="mb-2 font-semibold">Round <span id="round-num">1</span> of <span id="total-rounds-2">5</span></div>
-        <div class="mb-2">Your current balance: $<span id="balance">10</span></div>
-        <label for="send-amount" class="block mb-1">How much do you want to send? ($0-$10)</label>
-        <input type="number" id="send-amount" min="0" max="10" value="5" class="border rounded px-2 py-1 mb-2 w-full" />
-        <button id="send-btn" class="bg-blue-500 text-white px-4 py-2 rounded">Send</button>
-        <div id="feedback" class="mt-3 text-green-600 font-semibold"></div>
+
+<div class="game-container max-w-4xl mx-auto mt-8 p-6 bg-white rounded shadow">
+    <div class="flex justify-between items-center mb-4">
+        <h2 class="text-3xl font-bold text-blue-600">💰 Trust & Economics Challenge</h2>
+        <div class="text-right">
+            <div class="text-sm text-gray-600">Target: $200+</div>
+            <div class="text-lg font-bold text-green-600">Total Earned: $<span id="total-earned">0</span></div>
+        </div>
+    </div>
+    
+    <!-- Game Stats Dashboard -->
+    <div class="grid grid-cols-4 gap-4 mb-6 p-4 bg-gray-50 rounded">
+        <div class="text-center">
+            <div class="text-2xl font-bold text-blue-600" id="round-num">1</div>
+            <div class="text-sm text-gray-600">Round</div>
+        </div>
+        <div class="text-center">
+            <div class="text-2xl font-bold text-green-600">$<span id="balance">20</span></div>
+            <div class="text-sm text-gray-600">Available</div>
+        </div>
+        <div class="text-center">
+            <div class="text-2xl font-bold text-purple-600"><span id="trust-level">50</span>%</div>
+            <div class="text-sm text-gray-600">Partner Trust</div>
+        </div>
+        <div class="text-center">
+            <div class="text-2xl font-bold text-orange-600"><span id="streak">0</span></div>
+            <div class="text-sm text-gray-600">Win Streak</div>
+        </div>
     </div>
 
+    <!-- Partner Behavior Indicator -->
+    <div class="mb-4 p-3 bg-blue-50 rounded border-l-4 border-blue-400">
+        <div class="flex items-center justify-between">
+            <div>
+                <div class="font-semibold text-blue-800">Partner: <span id="partner-name">Alex</span></div>
+                <div class="text-sm text-blue-600" id="partner-mood">Feeling neutral about our partnership</div>
+            </div>
+            <div class="text-right">
+                <div class="text-sm text-gray-600">Last Return Rate</div>
+                <div class="text-lg font-bold text-blue-600"><span id="last-return">--</span>%</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="game-area">
+        <!-- Investment Decision Interface -->
+        <div class="mb-6 p-4 border-2 border-dashed border-gray-300 rounded">
+            <h3 class="text-lg font-semibold mb-3">💡 Your Investment Decision</h3>
+            <div class="mb-3">
+                <label class="block text-sm font-medium mb-2">How much will you invest with <span id="partner-name-2">Alex</span>?</label>
+                <div class="flex items-center space-x-4">
+                    <input type="range" id="send-slider" min="0" max="100" value="50" class="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer" />
+                    <div class="flex items-center space-x-2">
+                        <span class="text-sm">$</span>
+                        <input type="number" id="send-amount" min="0" class="w-20 border rounded px-2 py-1 text-center" value="10" />
+                        <span class="text-sm text-gray-600">/ $<span id="max-send">20</span></span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Investment Preview -->
+            <div class="mb-4 p-3 bg-yellow-50 rounded border border-yellow-200">
+                <div class="text-sm text-yellow-800">
+                    <div>💰 You invest: $<span id="invest-preview">10</span></div>
+                    <div>🔄 Partner receives: $<span id="partner-receives">30</span> (3x multiplier)</div>
+                    <div>📈 Expected return (~<span id="expected-return">50</span>%): $<span id="expected-amount">15</span></div>
+                    <div class="font-semibold mt-1">🎯 Your potential balance: $<span id="potential-balance">25</span></div>
+                </div>
+            </div>
+            
+            <button id="send-btn" class="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white px-6 py-3 rounded-lg font-semibold hover:from-blue-600 hover:to-purple-700 transition-all duration-200 transform hover:scale-105">
+                🚀 Make Investment
+            </button>
+        </div>
+        
+        <!-- Results Display -->
+        <div id="round-result" class="hidden mb-4 p-4 rounded-lg">
+            <div class="text-center">
+                <div class="text-2xl mb-2" id="result-emoji">🎉</div>
+                <div class="text-lg font-semibold mb-2" id="result-text"></div>
+                <div class="text-sm text-gray-600 mb-3" id="result-details"></div>
+                <button id="next-round-btn" class="bg-green-500 text-white px-6 py-2 rounded hover:bg-green-600 transition-colors">
+                    Continue to Next Round →
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Achievements Panel -->
+    <div class="mt-6 p-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded border border-purple-200">
+        <h3 class="text-lg font-semibold text-purple-800 mb-2">🏆 Achievements</h3>
+        <div class="grid grid-cols-2 gap-2 text-sm" id="achievements">
+            <div class="achievement locked" data-achievement="first-profit">🥇 First Profit</div>
+            <div class="achievement locked" data-achievement="trust-builder">🤝 Trust Builder</div>
+            <div class="achievement locked" data-achievement="risk-taker">🎲 Risk Taker</div>
+            <div class="achievement locked" data-achievement="conservative">🛡️ Conservative</div>
+            <div class="achievement locked" data-achievement="streak-5">🔥 5-Round Streak</div>
+            <div class="achievement locked" data-achievement="big-winner">💎 Big Winner ($200+)</div>
+        </div>
+    </div>
 </div>
 <script>
-const TOTAL_ROUNDS = 5;
-let currentRound = 1;
-let balance = 10;
-let events = [];
-let difficulty = 'medium'; // Placeholder for dynamic difficulty
+// Enhanced Game Configuration
+const TOTAL_ROUNDS = 15; // Extended gameplay for better data collection
+const STARTING_BALANCE = 20;
+const MULTIPLIER = 3; // Partner receives 3x what you send
+const TARGET_EARNINGS = 200;
 
-function getPartnerReturn(amount, difficulty) {
-    // Simulate partner return based on difficulty
-    if (difficulty === 'easy') return Math.round(amount * 0.8);
-    if (difficulty === 'hard') return Math.round(amount * 0.4);
-    return Math.round(amount * 0.6);
+// Game State
+let currentRound = 1;
+let balance = STARTING_BALANCE;
+let totalEarned = 0;
+let events = [];
+let gameCompleted = false;
+let winStreak = 0;
+let achievements = new Set();
+
+// Partner AI System - Dynamic and Adaptive
+let partnerTrust = 50; // 0-100 scale
+let partnerMood = 'neutral';
+let partnerHistory = [];
+let partnerPersonality = {
+    name: ['Alex', 'Jordan', 'Casey', 'Morgan', 'Riley'][Math.floor(Math.random() * 5)],
+    baseGenerosity: 0.4 + Math.random() * 0.3, // 40-70% base return rate
+    trustSensitivity: 0.1 + Math.random() * 0.2, // How much trust affects returns
+    adaptability: 0.05 + Math.random() * 0.1, // How quickly they adapt to player behavior
+    volatility: 0.1 + Math.random() * 0.2 // Random variation in behavior
+};
+
+function calculatePartnerReturn(amountSent, partnerReceived) {
+    // Advanced partner AI that considers:
+    // 1. Base personality
+    // 2. Trust level built over time
+    // 3. Recent player behavior
+    // 4. Random variation for realism
+    
+    let baseRate = partnerPersonality.baseGenerosity;
+    
+    // Trust adjustment
+    let trustBonus = (partnerTrust - 50) / 100 * partnerPersonality.trustSensitivity;
+    
+    // Recent behavior analysis
+    let recentRounds = partnerHistory.slice(-3);
+    let avgPlayerGenerosity = recentRounds.length > 0 ? 
+        recentRounds.reduce((sum, r) => sum + r.playerGenerosity, 0) / recentRounds.length : 0.5;
+    let reciprocityBonus = (avgPlayerGenerosity - 0.5) * 0.2;
+    
+    // Add some realistic volatility
+    let volatility = (Math.random() - 0.5) * partnerPersonality.volatility;
+    
+    // Calculate final return rate
+    let returnRate = Math.max(0.1, Math.min(0.9, baseRate + trustBonus + reciprocityBonus + volatility));
+    
+    return Math.round(partnerReceived * returnRate);
 }
 
 function logEvent(type, data) {
@@ -35,110 +164,427 @@ function logEvent(type, data) {
         event_type: type,
         round: currentRound,
         balance: balance,
-        difficulty: difficulty,
+        total_earned: totalEarned,
+        partner_trust: partnerTrust,
+        partner_name: partnerPersonality.name,
         timestamp: Date.now(),
         ...data
     });
 }
 
-function updateUI() {
-    document.getElementById('round-num').textContent = currentRound;
-    document.getElementById('total-rounds').textContent = TOTAL_ROUNDS;
-    document.getElementById('total-rounds-2').textContent = TOTAL_ROUNDS;
-    document.getElementById('balance').textContent = balance;
-    document.getElementById('send-amount').value = 5;
-    document.getElementById('feedback').textContent = '';
+function updatePartnerTrust(playerGenerosity, returnRate) {
+    // Update trust based on player's generosity and partner's response
+    let trustChange = 0;
+    
+    if (playerGenerosity > 0.6) {
+        trustChange += 5; // High investment builds trust
+    } else if (playerGenerosity < 0.3) {
+        trustChange -= 3; // Low investment reduces trust
+    }
+    
+    // Partner's own behavior affects their mood
+    if (returnRate > 0.6) {
+        trustChange += 2; // Being generous makes partner feel good
+    }
+    
+    partnerTrust = Math.max(0, Math.min(100, partnerTrust + trustChange));
+    
+    // Update partner mood based on trust level
+    if (partnerTrust > 70) {
+        partnerMood = 'very positive';
+    } else if (partnerTrust > 50) {
+        partnerMood = 'positive';
+    } else if (partnerTrust > 30) {
+        partnerMood = 'neutral';
+    } else {
+        partnerMood = 'cautious';
+    }
 }
 
+function updateAchievements() {
+    // Check and unlock achievements
+    if (totalEarned > 0 && !achievements.has('first-profit')) {
+        unlockAchievement('first-profit');
+    }
+    if (partnerTrust > 75 && !achievements.has('trust-builder')) {
+        unlockAchievement('trust-builder');
+    }
+    if (winStreak >= 5 && !achievements.has('streak-5')) {
+        unlockAchievement('streak-5');
+    }
+    if (totalEarned >= TARGET_EARNINGS && !achievements.has('big-winner')) {
+        unlockAchievement('big-winner');
+    }
+}
+
+function unlockAchievement(achievementId) {
+    achievements.add(achievementId);
+    const element = document.querySelector(`[data-achievement="${achievementId}"]`);
+    if (element) {
+        element.classList.remove('locked');
+        element.classList.add('unlocked');
+        element.style.backgroundColor = '#10B981';
+        element.style.color = 'white';
+        
+        // Show achievement notification
+        showNotification(`🎉 Achievement Unlocked: ${element.textContent}`);
+    }
+}
+
+function showNotification(message) {
+    const notification = document.createElement('div');
+    notification.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded shadow-lg z-50';
+    notification.textContent = message;
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.remove();
+    }, 3000);
+}
+
+function updateUI() {
+    // Update main stats
+    document.getElementById('round-num').textContent = currentRound;
+    document.getElementById('balance').textContent = balance;
+    document.getElementById('total-earned').textContent = totalEarned;
+    document.getElementById('trust-level').textContent = Math.round(partnerTrust);
+    document.getElementById('streak').textContent = winStreak;
+    
+    // Update partner info
+    document.getElementById('partner-name').textContent = partnerPersonality.name;
+    document.getElementById('partner-name-2').textContent = partnerPersonality.name;
+    document.getElementById('partner-mood').textContent = `Feeling ${partnerMood} about our partnership`;
+    
+    // Update investment interface
+    document.getElementById('send-amount').max = balance;
+    document.getElementById('send-slider').max = balance;
+    document.getElementById('max-send').textContent = balance;
+    
+    updateInvestmentPreview();
+}
+
+// Interactive Investment Preview
+function updateInvestmentPreview() {
+    const sendAmount = parseInt(document.getElementById('send-amount').value) || 0;
+    const partnerReceives = sendAmount * MULTIPLIER;
+    const expectedReturn = Math.round(partnerTrust / 100 * 0.6 * partnerReceives); // Rough estimate
+    const potentialBalance = balance - sendAmount + expectedReturn;
+    
+    document.getElementById('invest-preview').textContent = sendAmount;
+    document.getElementById('partner-receives').textContent = partnerReceives;
+    document.getElementById('expected-return').textContent = Math.round(partnerTrust * 0.6);
+    document.getElementById('expected-amount').textContent = expectedReturn;
+    document.getElementById('potential-balance').textContent = potentialBalance;
+}
+
+// Sync slider and input
+document.getElementById('send-slider').oninput = function() {
+    const percentage = this.value;
+    const amount = Math.round(balance * percentage / 100);
+    document.getElementById('send-amount').value = amount;
+    updateInvestmentPreview();
+};
+
+document.getElementById('send-amount').oninput = function() {
+    const amount = parseInt(this.value) || 0;
+    const percentage = Math.round((amount / balance) * 100);
+    document.getElementById('send-slider').value = percentage;
+    updateInvestmentPreview();
+};
+
+// Main investment logic
 document.getElementById('send-btn').onclick = function() {
     const sendAmount = parseInt(document.getElementById('send-amount').value, 10);
     if (isNaN(sendAmount) || sendAmount < 0 || sendAmount > balance) {
-        document.getElementById('feedback').textContent = 'Invalid amount.';
+        showNotification('❌ Invalid investment amount!');
         return;
     }
-    // Log send event
-    logEvent('send', {amount_sent: sendAmount});
+    
+    // Disable button during processing
+    document.getElementById('send-btn').disabled = true;
+    
+    // Calculate player generosity for AI
+    const playerGenerosity = sendAmount / balance;
+    const partnerReceives = sendAmount * MULTIPLIER;
+    
+    // Log investment decision
+    logEvent('investment', {
+        amount_sent: sendAmount,
+        player_generosity: playerGenerosity,
+        partner_receives: partnerReceives,
+        pre_investment_balance: balance,
+        pre_investment_trust: partnerTrust
+    });
+    
+    // Update balance
     balance -= sendAmount;
-    // Simulate partner return
-    const returned = getPartnerReturn(sendAmount, difficulty);
+    
+    // Calculate partner return using AI
+    const returned = calculatePartnerReturn(sendAmount, partnerReceives);
+    const returnRate = partnerReceives > 0 ? returned / partnerReceives : 0;
+    
+    // Update balance with return
     balance += returned;
-    logEvent('receive', {amount_received: returned});
-    document.getElementById('feedback').textContent = `You sent $${sendAmount}, partner returned $${returned}.`;
+    const roundProfit = returned - sendAmount;
+    totalEarned += roundProfit;
+    
+    // Update win streak
+    if (roundProfit > 0) {
+        winStreak++;
+        if (sendAmount > balance * 0.7) {
+            if (!achievements.has('risk-taker')) unlockAchievement('risk-taker');
+        }
+    } else {
+        winStreak = 0;
+        if (sendAmount < balance * 0.3) {
+            if (!achievements.has('conservative')) unlockAchievement('conservative');
+        }
+    }
+    
+    // Update partner trust and mood
+    updatePartnerTrust(playerGenerosity, returnRate);
+    
+    // Store round data for partner AI
+    partnerHistory.push({
+        round: currentRound,
+        playerGenerosity: playerGenerosity,
+        partnerReturn: returnRate,
+        profit: roundProfit
+    });
+    
+    // Log results
+    logEvent('round_result', {
+        amount_returned: returned,
+        return_rate: returnRate,
+        round_profit: roundProfit,
+        new_balance: balance,
+        new_total_earned: totalEarned,
+        new_trust_level: partnerTrust,
+        win_streak: winStreak
+    });
+    
+    // Update last return rate display
+    document.getElementById('last-return').textContent = Math.round(returnRate * 100);
+    
+    // Show round results
+    showRoundResult(sendAmount, returned, roundProfit, returnRate);
+    
+    // Check achievements
+    updateAchievements();
+};
+
+function showRoundResult(sent, returned, profit, returnRate) {
+    const resultDiv = document.getElementById('round-result');
+    const resultEmoji = document.getElementById('result-emoji');
+    const resultText = document.getElementById('result-text');
+    const resultDetails = document.getElementById('result-details');
+    
+    // Determine result type and styling
+    if (profit > 0) {
+        resultDiv.className = 'mb-4 p-4 rounded-lg bg-green-50 border border-green-200';
+        resultEmoji.textContent = '🎉';
+        resultText.textContent = `Great investment! You earned $${profit}`;
+        resultText.className = 'text-lg font-semibold mb-2 text-green-700';
+    } else if (profit === 0) {
+        resultDiv.className = 'mb-4 p-4 rounded-lg bg-yellow-50 border border-yellow-200';
+        resultEmoji.textContent = '😐';
+        resultText.textContent = 'Break even - no profit or loss';
+        resultText.className = 'text-lg font-semibold mb-2 text-yellow-700';
+    } else {
+        resultDiv.className = 'mb-4 p-4 rounded-lg bg-red-50 border border-red-200';
+        resultEmoji.textContent = '😞';
+        resultText.textContent = `Investment loss: $${Math.abs(profit)}`;
+        resultText.className = 'text-lg font-semibold mb-2 text-red-700';
+    }
+    
+    resultDetails.innerHTML = `
+        💰 You invested: $${sent}<br>
+        🔄 ${partnerPersonality.name} received: $${sent * MULTIPLIER}<br>
+        📈 ${partnerPersonality.name} returned: $${returned} (${Math.round(returnRate * 100)}%)<br>
+        💎 Your new balance: $${balance}
+    `;
+    
+    resultDiv.classList.remove('hidden');
+    
+    // Hide investment interface
+    document.querySelector('.border-dashed').style.display = 'none';
+};
+
+// Next round button logic
+document.getElementById('next-round-btn').onclick = function() {
     if (currentRound < TOTAL_ROUNDS) {
         currentRound++;
-        setTimeout(() => {
-            updateUI();
-        }, 1000);
+        
+        // Reset UI for next round
+        document.getElementById('round-result').classList.add('hidden');
+        document.querySelector('.border-dashed').style.display = 'block';
+        document.getElementById('send-btn').disabled = false;
+        
+        // Update UI
+        updateUI();
+        
+        // Log new round start
+        logEvent('round_start', {
+            round: currentRound,
+            starting_balance: balance,
+            partner_trust: partnerTrust
+        });
     } else {
-        document.getElementById('game-area').innerHTML = `<div class='font-bold text-lg'>Game Over! Final balance: $${balance}</div>`;
-        logEvent('end', {final_balance: balance});
-        // Mark that we're saving to backend to avoid duplicate saves
-        logEvent('backend_saved', {});
-        sendEventsToBackend();
-        currentRound = TOTAL_ROUNDS + 1; // Mark game as completed
+        // Game completed!
+        endGame();
     }
 };
 
+function endGame() {
+    gameCompleted = true;
+    
+    // Final achievement check
+    updateAchievements();
+    
+    // Calculate final performance
+    const profitMargin = ((totalEarned / (STARTING_BALANCE * TOTAL_ROUNDS)) * 100).toFixed(1);
+    const avgTrust = partnerHistory.length > 0 ? 
+        (partnerHistory.reduce((sum, r) => sum + (r.partnerReturn * 100), 0) / partnerHistory.length).toFixed(1) : 0;
+    
+    // Show final results
+    document.getElementById('game-area').innerHTML = `
+        <div class="text-center p-6 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border-2 border-blue-200">
+            <div class="text-4xl mb-4">${totalEarned >= TARGET_EARNINGS ? '🏆' : totalEarned > 0 ? '🎉' : '💪'}</div>
+            <h3 class="text-2xl font-bold mb-4 text-blue-800">
+                ${totalEarned >= TARGET_EARNINGS ? 'Outstanding Performance!' : totalEarned > 0 ? 'Good Job!' : 'Learning Experience!'}
+            </h3>
+            
+            <div class="grid grid-cols-2 gap-4 mb-6 text-center">
+                <div class="p-3 bg-white rounded border">
+                    <div class="text-2xl font-bold text-green-600">$${totalEarned}</div>
+                    <div class="text-sm text-gray-600">Total Earned</div>
+                </div>
+                <div class="p-3 bg-white rounded border">
+                    <div class="text-2xl font-bold text-blue-600">${Math.round(partnerTrust)}%</div>
+                    <div class="text-sm text-gray-600">Final Trust</div>
+                </div>
+                <div class="p-3 bg-white rounded border">
+                    <div class="text-2xl font-bold text-purple-600">${profitMargin}%</div>
+                    <div class="text-sm text-gray-600">Profit Margin</div>
+                </div>
+                <div class="p-3 bg-white rounded border">
+                    <div class="text-2xl font-bold text-orange-600">${achievements.size}</div>
+                    <div class="text-sm text-gray-600">Achievements</div>
+                </div>
+            </div>
+            
+            <div class="mb-4 p-3 bg-yellow-50 rounded border border-yellow-200">
+                <div class="text-sm text-yellow-800">
+                    <strong>Partnership with ${partnerPersonality.name}:</strong><br>
+                    Average return rate: ${avgTrust}% • Final relationship: ${partnerMood}
+                </div>
+            </div>
+            
+            <button onclick="location.href='/games/'" class="bg-blue-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-600 transition-colors">
+                🏠 Return to Games
+            </button>
+        </div>
+    `;
+    
+    // Log game completion
+    logEvent('game_complete', {
+        final_balance: balance,
+        total_earned: totalEarned,
+        final_trust: partnerTrust,
+        profit_margin: profitMargin,
+        achievements_unlocked: Array.from(achievements),
+        partner_name: partnerPersonality.name,
+        avg_return_rate: avgTrust
+    });
+    
+    // Save to backend
+    logEvent('backend_saved', {});
+    sendEventsToBackend();
+}
+
+// Back to games button
 document.getElementById('back-to-games').onclick = function() {
-    // Disable the button to prevent double clicks
     document.getElementById('back-to-games').disabled = true;
-    // If game is still active, end session first
-    if (currentRound <= TOTAL_ROUNDS) {
-        logEvent('manual_end', {final_balance: balance});
-        // Disable send button and input
-        document.getElementById('send-btn').disabled = true;
-        document.getElementById('send-amount').disabled = true;
-        document.getElementById('game-area').innerHTML = `<div class='font-bold text-lg text-red-600'>Session Ended! Final balance: $${balance}</div>`;
-        // Save data and then redirect
+    
+    if (!gameCompleted) {
+        // Game abandoned early
+        logEvent('game_abandoned', {
+            final_balance: balance,
+            total_earned: totalEarned,
+            rounds_completed: currentRound - 1,
+            final_trust: partnerTrust
+        });
+        
+        // Save data and redirect
+        logEvent('backend_saved', {});
         sendEventsToBackend().then(() => {
             window.location.href = '/games/';
         }).catch(() => {
-            // Even if save fails, still redirect
             window.location.href = '/games/';
         });
     } else {
-        // Game is completed, ensure data is saved before redirecting
-        // Check if we need to save the completed game data
-        if (events.length > 0 && !events.some(e => e.event_type === 'backend_saved')) {
-            // Mark that we're saving to backend to avoid duplicate saves
-            logEvent('backend_saved', {});
-            sendEventsToBackend().then(() => {
-                window.location.href = '/games/';
-            }).catch(() => {
-                // Even if save fails, still redirect
-                window.location.href = '/games/';
-            });
-        } else {
-            // Data already saved or no data to save, safe to redirect
-            window.location.href = '/games/';
-        }
+        // Game already completed
+        window.location.href = '/games/';
     }
 };
 
 function sendEventsToBackend() {
-    return fetch('/games/save_game_result/', {
+    const completionStatus = gameCompleted ? 'completed' : 'abandoned';
+    const gameStartTime = events.length > 0 ? events[0].timestamp : Date.now();
+    const gameDuration = Date.now() - gameStartTime;
+    
+    // Calculate comprehensive game metrics for psychological analysis
+    const investmentDecisions = events.filter(e => e.event_type === 'investment');
+    const avgInvestmentAmount = investmentDecisions.length > 0 ? 
+        investmentDecisions.reduce((sum, e) => sum + e.amount_sent, 0) / investmentDecisions.length : 0;
+    const avgGenerosity = investmentDecisions.length > 0 ? 
+        investmentDecisions.reduce((sum, e) => sum + e.player_generosity, 0) / investmentDecisions.length : 0;
+    
+    const gameData = {
+        game_type: 'money_exchange_1',
+        score: Math.max(0, totalEarned), // Use total earned as score
+        duration: gameDuration,
+        decisions: investmentDecisions,
+        reaction_times: [], // Could add decision times in future
+        raw_data: {
+            events: events,
+            partner_personality: partnerPersonality,
+            partner_history: partnerHistory,
+            final_metrics: {
+                total_earned: totalEarned,
+                final_balance: balance,
+                final_trust: partnerTrust,
+                rounds_completed: currentRound - 1,
+                avg_investment: avgInvestmentAmount,
+                avg_generosity: avgGenerosity,
+                win_streak_max: Math.max(...events.filter(e => e.win_streak).map(e => e.win_streak), 0),
+                achievements_unlocked: Array.from(achievements),
+                partner_final_mood: partnerMood
+            }
+        },
+        completion_status: completionStatus
+    };
+    
+    return fetch('/games/save-result/', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'X-CSRFToken': getCookie('csrftoken')
         },
-        body: JSON.stringify({
-            game_type: 'money_exchange_1',
-            score: balance,
-            duration: TOTAL_ROUNDS * 10, // Placeholder
-            decisions: events.filter(e => e.event_type === 'send'),
-            reaction_times: [],
-            raw_data: {events: events}
-        })
+        body: JSON.stringify(gameData)
     })
     .then(res => res.json())
     .then(data => {
         if (data.success) {
-            console.log('Session saved successfully');
+            console.log('Enhanced game data saved successfully:', data);
         } else {
-            console.error('Error saving session: ' + data.error);
+            console.error('Error saving game data:', data.error);
         }
         return data;
+    })
+    .catch(error => {
+        console.error('Network error saving game data:', error);
+        return {success: false, error: error.message};
     });
 }
 
@@ -157,6 +603,68 @@ function getCookie(name) {
     return cookieValue;
 }
 
-updateUI();
+// Initialize game
+document.addEventListener('DOMContentLoaded', function() {
+    // Add CSS for achievements
+    const style = document.createElement('style');
+    style.textContent = `
+        .achievement {
+            padding: 8px 12px;
+            border-radius: 6px;
+            transition: all 0.3s ease;
+            cursor: default;
+        }
+        .achievement.locked {
+            background-color: #f3f4f6;
+            color: #9ca3af;
+            border: 1px solid #e5e7eb;
+        }
+        .achievement.unlocked {
+            background-color: #10b981;
+            color: white;
+            border: 1px solid #059669;
+            box-shadow: 0 2px 4px rgba(16, 185, 129, 0.3);
+            animation: achievementUnlock 0.5s ease-out;
+        }
+        @keyframes achievementUnlock {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        .send-slider::-webkit-slider-thumb {
+            appearance: none;
+            height: 20px;
+            width: 20px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+        }
+        .send-slider::-moz-range-thumb {
+            height: 20px;
+            width: 20px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+            border: none;
+        }
+    `;
+    document.head.appendChild(style);
+    
+    // Initialize UI
+    updateUI();
+    
+    // Log game start
+    logEvent('game_start', {
+        starting_balance: balance,
+        partner_name: partnerPersonality.name,
+        partner_base_generosity: partnerPersonality.baseGenerosity,
+        target_earnings: TARGET_EARNINGS,
+        total_rounds: TOTAL_ROUNDS
+    });
+    
+    console.log('Enhanced Money Exchange Game #1 initialized!');
+    console.log('Partner:', partnerPersonality.name, 'Base generosity:', (partnerPersonality.baseGenerosity * 100).toFixed(1) + '%');
+});
+
 </script>
 {% endblock %}
