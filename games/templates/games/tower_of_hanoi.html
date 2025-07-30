@@ -55,24 +55,22 @@
     <!-- Modals -->
     <div id="instruction-modal" class="modal" style="display: flex;">
         <div class="modal-content">
-            <h3 style="font-size: 1.5rem; font-weight: bold; color: var(--primary-color);">Progressive Planning Challenge</h3>
-            <p style="text-align: left; margin: 1.5rem 0; color: #ccc;">
-                Your goal is to move the entire stack of disks from the starting peg to the one on the far right.
-                <br><br>
-                <strong>How to Play:</strong>
-                <ul style="list-style-position: inside; text-align: left; margin-top: 0.5rem; margin-bottom: 1rem;">
-                    <li>Click a peg to lift the top disk.</li>
-                    <li>Click another peg to place it.</li>
+            <h2 style="font-size: 1.5rem; font-weight: bold; color: var(--primary-color);">Progressive Planning Challenge</h2>
+            <div style="text-align: left; margin: 1.5rem 0;">
+                <p><strong>The Goal:</strong> Your objective is to solve a series of puzzles by moving a stack of disks to a new tower.</p>
+                <p><strong>How to Play:</strong></p>
+                <ul style="margin-left: 20px; padding-left: 10px;">
+                    <li style="margin-bottom: 10px;">Move the entire stack of disks from the starting tower to the destination tower (the rightmost one).</li>
+                    <li style="margin-bottom: 10px;">Click a tower to select the top disk, then click another tower to move it.</li>
                 </ul>
-
-                <strong>The Rules:</strong>
-                <ul style="list-style-position: inside; text-align: left; margin-top: 0.5rem;">
-                    <li>You can only move one disk at a time.</li>
-                    <li>A larger disk can <strong>never</strong> be placed on top of a smaller one.</li>
+                <p><strong>The Rules:</strong></p>
+                <ul style="margin-left: 20px; padding-left: 10px;">
+                    <li style="margin-bottom: 10px;">You can only move one disk at a time.</li>
+                    <li>A larger disk can <strong>never</strong> be placed on top of a smaller disk.</li>
                 </ul>
-            </p>
-            <p style="font-weight: bold;">Aim for the fewest moves possible. The challenge will grow.</p>
-            <button id="start-game-btn" class="btn" style="margin-top: 1.5rem;">Begin</button>
+                <p><strong>The Challenge:</strong> The puzzles will become more complex as you succeed. Aim for the fewest moves possible. Think ahead!</p>
+            </div>
+            <button id="start-game-btn" class="btn">Begin Challenge</button>
         </div>
     </div>
 

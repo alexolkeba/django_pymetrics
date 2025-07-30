@@ -74,17 +74,18 @@
     <!-- Modals -->
     <div id="instruction-modal" class="modal" style="display: flex;">
         <div class="modal-content">
-            <h3 style="font-size: 1.5rem; font-weight: bold; color: var(--primary-color);">The Trust Dilemma</h3>
-            <p style="text-align: left; margin: 1.5rem 0; color: #ccc;">
-                This is a game of investment and trust. You start with <strong>$100</strong> and will interact with a partner over <strong>15 rounds</strong>.
-                <br><br>
-                In each round, you can invest between <strong>$0 and $10</strong> of your total balance. Any amount you invest is <strong>tripled</strong> and given to your partner. Your partner, who has a unique personality (e.g., Generous, Selfish), then decides how much of the tripled amount to return to you.
-                <br><br>
-                Your goal is to grow your initial $100 by learning to predict your partner's behavior. Your investment choices will also influence their trust in you, affecting their future decisions.
-                <br><br>
-                This task measures your ability to make strategic decisions under uncertainty and build trust.
-            </p>
-            <button id="start-game-btn" class="btn" style="margin-top: 1.5rem;">Begin</button>
+            <h2>The Trust Dilemma</h2>
+            <div style="text-align: left; margin: 1.5rem 0;">
+                <p><strong>The Goal:</strong> Your objective is to maximize your final balance over 15 rounds by making strategic investments with a partner.</p>
+                <p><strong>How to Play:</strong></p>
+                <ul style="margin-left: 20px; padding-left: 10px;">
+                    <li style="margin-bottom: 10px;">In each round, you can invest up to $10. This amount is deducted from your total balance.</li>
+                    <li style="margin-bottom: 10px;">The amount you send to your partner is then <strong>tripled</strong>.</li>
+                    <li style="margin-bottom: 10px;">Your partner decides how much of this tripled amount to return to you, which is added back to your balance.</li>
+                </ul>
+                <p><strong>The Challenge:</strong> Your partner has a unique personality, and their generosity may change based on your decisions. Building trust could lead to higher profits, but misplaced trust can be costly. Can you adapt your strategy to earn the most money?</p>
+            </div>
+            <button id="start-game-btn" class="btn">Begin</button>
         </div>
     </div>
 

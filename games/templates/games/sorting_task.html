@@ -111,6 +111,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const elements = {
         body: document.querySelector('.game-body'),
         instructionModal: document.getElementById('instruction-modal'),
+        startGameBtn: document.getElementById('start-game-btn'),
         finalResultsModal: document.getElementById('final-results-modal'),
         startGameBtn: document.getElementById('start-game-btn'),
         backToGamesBtn: document.getElementById('back-to-games-btn'),
@@ -152,6 +153,7 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.finalResultsModal.style.display = 'none';
 
         // Setup event listeners
+        elements.startGameBtn.addEventListener('click', startGame);
         elements.startGameBtn.addEventListener('click', startGame);
         elements.backToGamesBtn.addEventListener('click', handleExit);
         elements.returnToGamesFinalBtn.addEventListener('click', handleExit);
