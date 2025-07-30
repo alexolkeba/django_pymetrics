@@ -44,7 +44,7 @@
             <div class="stat-card"><div id="trial-count" class="value">-</div><div class="label">Trial</div></div>
             <div class="stat-card"><div id="score" class="value">0</div><div class="label">Score</div></div>
             <div class="stat-card"><div id="accuracy" class="value">-</div><div class="label">Accuracy</div></div>
-            <div class="stat-card"><div id="avg-rt" class="value">-</div><div class="label">Avg. RT (ms)</div></div>
+            <div class="stat-card"><div id="time-limit" class="value">-</div><div class="label">Time Limit</div></div>
         </div>
         <div class="game-area">
             <div id="stimulus-area"></div>
@@ -113,7 +113,6 @@ document.addEventListener('DOMContentLoaded', () => {
         instructionModal: document.getElementById('instruction-modal'),
         startGameBtn: document.getElementById('start-game-btn'),
         finalResultsModal: document.getElementById('final-results-modal'),
-        startGameBtn: document.getElementById('start-game-btn'),
         backToGamesBtn: document.getElementById('back-to-games-btn'),
         returnToGamesFinalBtn: document.getElementById('return-to-games-final-btn'),
         trialCount: document.getElementById('trial-count'),
@@ -153,7 +152,6 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.finalResultsModal.style.display = 'none';
 
         // Setup event listeners
-        elements.startGameBtn.addEventListener('click', startGame);
         elements.startGameBtn.addEventListener('click', startGame);
         elements.backToGamesBtn.addEventListener('click', handleExit);
         elements.returnToGamesFinalBtn.addEventListener('click', handleExit);

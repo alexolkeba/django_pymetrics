@@ -1,8 +1,283 @@
 {% extends 'base.html' %}
+{% load static %}
 {% block content %}
-<div class="max-w-lg mx-auto mt-8 text-center p-8 bg-gray-800 rounded-lg shadow-lg">
-    <h1 class="text-3xl font-bold mb-4 text-white">Trust Game</h1>
-    <p class="text-xl text-gray-300 mb-6">This game is currently under construction.</p>
-    <a href="{% url 'games:game_list' %}" class="inline-block px-6 py-3 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors">← Back to Games</a>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+<style>
+    :root {
+        --primary-color: #22D3EE; /* Cyan-400 */
+        --secondary-color: #6366F1; /* Indigo-500 */
+        --background-color: #0F172A; /* Slate-900 */
+        --surface-color: #1E293B;   /* Slate-800 */
+        --text-color: #F1F5F9;       /* Slate-100 */
+        --muted-text-color: #94A3B8; /* Slate-400 */
+        --border-color: #334155;     /* Slate-700 */
+    }
+    .game-body { background-color: var(--background-color); color: var(--text-color); font-family: 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 1rem; }
+    .game-container { background-color: var(--surface-color); border-radius: 12px; border: 1px solid var(--border-color); box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3); width: 100%; max-width: 700px; overflow: hidden; }
+    .game-header { background-color: rgba(0,0,0,0.2); padding: 1.5rem; text-align: center; border-bottom: 1px solid var(--border-color); }
+    .game-header h2 { font-size: 1.75rem; font-weight: bold; margin: 0; }
+    .dashboard { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; padding: 1.5rem; border-bottom: 1px solid var(--border-color); }
+    .stat-card { background-color: rgba(0,0,0,0.2); padding: 1rem; border-radius: 8px; text-align: center; }
+    .stat-card .value { font-size: 1.75rem; font-weight: bold; color: var(--primary-color); }
+    .stat-card .label { font-size: 0.8rem; color: var(--muted-text-color); text-transform: uppercase; font-weight: 600; }
+    .game-area { padding: 2rem; min-height: 300px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+    .slider-container { margin: 2rem 0; width: 80%; }
+    #investment-slider { width: 100%; }
+    .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); justify-content: center; align-items: center; }
+    .modal-content { background-color: var(--surface-color); padding: 2.5rem; border-radius: 12px; border: 1px solid var(--border-color); max-width: 500px; width: 90%; box-shadow: 0 5px 15px rgba(0,0,0,0.5); animation: modal-pop 0.3s ease-out; text-align: center; }
+    @keyframes modal-pop { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    .btn { padding: 0.75rem 2rem; border: none; border-radius: 8px; font-size: 1rem; font-weight: bold; cursor: pointer; transition: all 0.2s; color: var(--background-color); background-color: var(--primary-color); }
+    .btn:hover { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(34, 211, 238, 0.3); }
+    .btn:disabled { background-color: #555; cursor: not-allowed; }
+    #back-to-games-btn { position: absolute; top: 20px; left: 20px; background-color: rgba(0, 0, 0, 0.3); color: var(--text-color); padding: 0.5rem 1rem; border-radius: 8px; text-decoration: none; font-weight: bold; z-index: 10; }
+</style>
+
+<div class="game-body" data-game-list-url="{% url 'games:game_list' %}" data-csrf-token="{{ csrf_token }}">
+    <a href="#" id="back-to-games-btn"><i class="fas fa-arrow-left"></i> Back to Games</a>
+
+    <div class="game-container">
+        <div class="game-header"><h2>Trust & Investment Challenge</h2></div>
+        <div class="dashboard">
+            <div class="stat-card"><div id="total-earnings-display" class="value">$0</div><div class="label">Total Earnings</div></div>
+            <div class="stat-card"><div id="round-display" class="value">- / -</div><div class="label">Round</div></div>
+        </div>
+        <div class="game-area">
+            <div id="decision-phase">
+                <h3 id="round-prompt" style="font-size: 1.5rem; margin-bottom: 1rem;"></h3>
+                <div class="slider-container">
+                    <input type="range" min="0" max="10" value="5" class="slider" id="investment-slider">
+                    <div style="font-size: 1.2rem; margin-top: 1rem;">You will invest: <strong id="investment-amount-display" style="color: var(--primary-color);">$5</strong></div>
+                </div>
+                <button id="invest-btn" class="btn">Confirm Investment</button>
+            </div>
+            <div id="outcome-phase" style="display: none; font-size: 1.2rem;">
+                <p id="outcome-text"></p>
+                <button id="next-round-btn" class="btn" style="margin-top: 2rem;">Next Round</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div id="instruction-modal" class="modal" style="display: flex;">
+        <div class="modal-content">
+            <h3 style="font-size: 1.5rem; font-weight: bold; color: var(--primary-color);">Trust & Investment Challenge</h3>
+            <div style="text-align: left; margin: 1.5rem 0; color: #ccc;">
+                <p><strong>The Goal:</strong> Your goal is to maximize your earnings by making wise investment decisions with a partner.</p>
+                <p><strong>How to Play:</strong></p>
+                <ul style="margin-left: 20px; padding-left: 10px;">
+                    <li style="margin-bottom: 10px;">The game consists of 10 rounds. In each round, you start with $10.</li>
+                    <li style="margin-bottom: 10px;">You decide how much of your $10 to send to your partner. This amount will be <strong>tripled</strong>.</li>
+                    <li style="margin-bottom: 10px;">Your partner (the Trustee) will then decide how much of the tripled amount to send back to you.</li>
+                    <li>Your earnings for the round are the money you kept plus the money your partner sent back.</li>
+                </ul>
+                <p><strong>The Challenge:</strong> Your partner's decisions may not always be predictable. Can you learn to trust them and grow your total earnings?</p>
+            </div>
+            <button id="start-game-btn" class="btn">Start Challenge</button>
+        </div>
+    </div>
+
+    <div id="final-results-modal" class="modal">
+        <div class="modal-content">
+            <h3 style="font-size: 1.5rem; font-weight: bold; color: var(--primary-color);">Challenge Complete!</h3>
+            <div id="final-summary" style="margin: 1.5rem 0; font-size: 1.1rem; line-height: 1.8;"></div>
+            <button id="return-to-games-final-btn" class="btn">Return to Games</button>
+        </div>
+    </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // --- CONFIGURATION ---
+    const config = {
+        GAME_ID: 'trust_game',
+        TOTAL_ROUNDS: 10,
+        INITIAL_ENDOWMENT: 10,
+        MULTIPLIER: 3,
+    };
+
+    // --- DOM ELEMENTS ---
+    const elements = {
+        body: document.querySelector('.game-body'),
+        instructionModal: document.getElementById('instruction-modal'),
+        finalResultsModal: document.getElementById('final-results-modal'),
+        startGameBtn: document.getElementById('start-game-btn'),
+        backToGamesBtn: document.getElementById('back-to-games-btn'),
+        returnToGamesFinalBtn: document.getElementById('return-to-games-final-btn'),
+        totalEarningsDisplay: document.getElementById('total-earnings-display'),
+        roundDisplay: document.getElementById('round-display'),
+        decisionPhase: document.getElementById('decision-phase'),
+        outcomePhase: document.getElementById('outcome-phase'),
+        roundPrompt: document.getElementById('round-prompt'),
+        investmentSlider: document.getElementById('investment-slider'),
+        investmentAmountDisplay: document.getElementById('investment-amount-display'),
+        investBtn: document.getElementById('invest-btn'),
+        outcomeText: document.getElementById('outcome-text'),
+        nextRoundBtn: document.getElementById('next-round-btn'),
+        finalSummary: document.getElementById('final-summary'),
+    };
+
+    // --- GAME STATE ---
+    let state = {};
+
+    function resetState() {
+        state = {
+            currentRound: 0,
+            totalEarnings: 0,
+            gameStartTime: 0,
+            eventLog: [],
+            isSaving: false,
+            gameCompleted: false,
+        };
+    }
+
+    // --- CORE GAME LOGIC ---
+    function init() {
+        resetState();
+        elements.instructionModal.style.display = 'flex';
+        updateDashboard();
+        
+        // Event Listeners
+        elements.startGameBtn.addEventListener('click', startGame);
+        elements.investBtn.addEventListener('click', handleInvestment);
+        elements.nextRoundBtn.addEventListener('click', runRound);
+        elements.backToGamesBtn.addEventListener('click', handleExit);
+        elements.returnToGamesFinalBtn.addEventListener('click', handleExit);
+        elements.investmentSlider.addEventListener('input', () => {
+            elements.investmentAmountDisplay.textContent = `$${elements.investmentSlider.value}`;
+        });
+    }
+
+    function startGame() {
+        state.gameStartTime = performance.now();
+        logEvent('game_start');
+        elements.instructionModal.style.display = 'none';
+        runRound();
+    }
+
+    function runRound() {
+        state.currentRound++;
+        if (state.currentRound > config.TOTAL_ROUNDS) {
+            endGame(true);
+            return;
+        }
+        updateDashboard();
+        elements.decisionPhase.style.display = 'block';
+        elements.outcomePhase.style.display = 'none';
+        elements.roundPrompt.textContent = `You have $${config.INITIAL_ENDOWMENT}. How much will you invest?`;
+        elements.investmentSlider.value = Math.floor(config.INITIAL_ENDOWMENT / 2);
+        elements.investmentAmountDisplay.textContent = `$${elements.investmentSlider.value}`;
+        elements.investBtn.disabled = false;
+    }
+
+    function handleInvestment() {
+        elements.investBtn.disabled = true;
+        const amountInvested = parseInt(elements.investmentSlider.value, 10);
+        const amountKept = config.INITIAL_ENDOWMENT - amountInvested;
+        const tripledAmount = amountInvested * config.MULTIPLIER;
+        
+        // Trustee's decision logic
+        const baseReturnRate = amountInvested / config.INITIAL_ENDOWMENT; // 0 to 1
+        const noise = (Math.random() - 0.5) * 0.2; // Adds variability: -0.1 to +0.1
+        const returnRate = Math.max(0, Math.min(1, baseReturnRate + noise));
+        const amountReturned = Math.floor(tripledAmount * returnRate);
+
+        const roundEarnings = amountKept + amountReturned;
+        state.totalEarnings += roundEarnings;
+
+        logEvent('investment', {
+            round: state.currentRound,
+            invested: amountInvested,
+            kept: amountKept,
+            tripled: tripledAmount,
+            returned: amountReturned,
+            round_earnings: roundEarnings,
+            total_earnings: state.totalEarnings
+        });
+
+        showOutcome(amountInvested, tripledAmount, amountReturned, roundEarnings);
+        updateDashboard();
+    }
+
+    function showOutcome(invested, tripled, returned, earnings) {
+        elements.decisionPhase.style.display = 'none';
+        elements.outcomePhase.style.display = 'block';
+        elements.outcomeText.innerHTML = `
+            You invested <strong>$${invested}</strong>, which was tripled to <strong>$${tripled}</strong>.<br>
+            Your partner returned <strong>$${returned}</strong>.<br>
+            You earned <strong>$${earnings}</strong> this round.
+        `;
+        if (state.currentRound === config.TOTAL_ROUNDS) {
+            elements.nextRoundBtn.textContent = 'Finish Game';
+        }
+    }
+
+    function endGame(completed) {
+        state.gameCompleted = completed;
+        logEvent(completed ? 'game_complete' : 'game_abandoned');
+        displayFinalResults();
+    }
+
+    // --- UI & DISPLAY ---
+    function updateDashboard() {
+        elements.totalEarningsDisplay.textContent = `$${state.totalEarnings}`;
+        elements.roundDisplay.textContent = `${state.currentRound} / ${config.TOTAL_ROUNDS}`;
+    }
+
+    async function displayFinalResults() {
+        await sendDataToBackend();
+        const avgInvestment = state.eventLog.filter(e => e.type === 'investment').reduce((sum, e) => sum + e.details.invested, 0) / config.TOTAL_ROUNDS;
+        elements.finalSummary.innerHTML = `
+            <div><strong>Final Earnings:</strong> <span style="color: var(--primary-color)">$${state.totalEarnings}</span></div>
+            <div><strong>Average Investment:</strong> <span style="color: var(--primary-color)">$${avgInvestment.toFixed(2)}</span></div>
+        `;
+        elements.finalResultsModal.style.display = 'flex';
+    }
+
+    // --- DATA & UTILS ---
+    function logEvent(type, details = {}) {
+        state.eventLog.push({ type, timestamp: performance.now(), details });
+    }
+
+    async function handleExit(e) {
+        e.preventDefault();
+        if (state.isSaving) return;
+        if (state.gameStartTime && !state.gameCompleted) {
+            await endGame(false);
+        }
+        window.location.href = elements.body.dataset.gameListUrl;
+    }
+
+    async function sendDataToBackend() {
+        if (state.isSaving || !state.gameStartTime) return;
+        state.isSaving = true;
+
+        const payload = {
+            game_name: config.GAME_ID,
+            score: state.totalEarnings,
+            duration_ms: Math.round(performance.now() - state.gameStartTime),
+            completion_status: state.gameCompleted ? 'completed' : 'abandoned',
+            events: state.eventLog,
+        };
+
+        try {
+            const response = await fetch('{% url "games:save_score" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': elements.body.dataset.csrfToken
+                },
+                body: JSON.stringify(payload)
+            });
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        } catch (error) {
+            console.error('Error saving game result:', error);
+        } finally {
+            state.isSaving = false;
+        }
+    }
+
+    // --- INITIALIZE ---
+    init();
+});
+</script>
 {% endblock %}
