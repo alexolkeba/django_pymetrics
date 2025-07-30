@@ -65,9 +65,21 @@
     <!-- Modals -->
     <div id="instruction-modal" class="modal" style="display: flex;">
         <div class="modal-content">
-            <h3>Welcome to the Cognitive Control Challenge!</h3>
-            <p>Your task is to identify the FONT COLOR of the word, not the word itself. Respond as quickly and accurately as possible. The time you have to answer will adapt based on your performance.</p>
-            <button id="start-game-btn" class="btn">Start Congruent Block</button>
+            <h3 style="font-size: 1.5rem; font-weight: bold; color: var(--primary-color);">Cognitive Control Challenge</h3>
+            <p style="text-align: left; margin: 1.5rem 0; color: #ccc;">
+                This classic test measures your ability to suppress a habitual response and focus on a specific instruction—a key part of cognitive control.
+                <br><br>
+                <strong>Your Task:</strong> A word will appear on the screen. Your job is to ignore what the word says and instead click the button corresponding to the <strong>COLOR</strong> the word is written in.
+                <br><br>
+                <strong>Game Structure:</strong>
+                <ul style="list-style-position: inside; text-align: left; margin-top: 0.5rem;">
+                    <li style="margin-bottom: 0.5rem;"><strong>Warm-up Block:</strong> The word and its ink color will match (e.g., 'RED' in red ink).</li>
+                    <li><strong>Challenge Blocks:</strong> The word and ink color will often conflict (e.g., 'RED' in blue ink).</li>
+                </ul>
+                <br>
+                The conflict is the real test. Your goal is to stay focused and respond as quickly and accurately as possible.
+            </p>
+            <button id="start-game-btn" class="btn">Start Challenge</button>
         </div>
     </div>
     <div id="break-modal" class="modal">
@@ -106,10 +118,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const colorButtonsContainer = document.getElementById('color-buttons');
     const feedbackIndicator = document.getElementById('feedback-indicator');
     const instructionModal = document.getElementById('instruction-modal');
-    const breakModal = document.getElementById('break-modal');
     const finalResultsModal = document.getElementById('final-results-modal');
     const startGameBtn = document.getElementById('start-game-btn');
-    const startIncongruentBtn = document.getElementById('start-incongruent-btn');
     const returnToGamesBtn = document.getElementById('return-to-games-btn');
     const backToGamesBtn = document.getElementById('back-to-games');
     const timerBar = document.getElementById('timer-bar');
@@ -237,12 +247,14 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => {
             if (blockTrialCount < TRIALS_PER_BLOCK) {
                 presentTrial();
-            } else {
+            } else { // A block has just ended
                 if (gameState === 'congruent') {
-                    gameState = 'break';
+                    // Automatically start the incongruent block
+                    gameState = 'incongruent';
                     blockTrialCount = 0;
-                    showModal(breakModal);
+                    presentTrial(); // Start the next phase
                 } else if (gameState === 'incongruent') {
+                    // The game is complete
                     endGame();
                 }
             }
@@ -254,12 +266,6 @@ document.addEventListener('DOMContentLoaded', () => {
         gameStartTime = Date.now();
         events.push({ event_type: 'game_start', timestamp: 0 });
         hideModal(instructionModal);
-        presentTrial();
-    };
-
-    const startIncongruentBlock = () => {
-        gameState = 'incongruent';
-        hideModal(breakModal);
         presentTrial();
     };
 
@@ -337,7 +343,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- EVENT LISTENERS ---
     startGameBtn.addEventListener('click', startGame);
-    startIncongruentBtn.addEventListener('click', startIncongruentBlock);
     
     const handleExit = async (e) => {
         e.preventDefault();

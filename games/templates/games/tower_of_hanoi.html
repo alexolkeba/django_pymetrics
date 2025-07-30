@@ -55,13 +55,23 @@
     <!-- Modals -->
     <div id="instruction-modal" class="modal" style="display: flex;">
         <div class="modal-content">
-            <h3 style="font-size: 1.5rem; font-weight: bold; color: var(--primary-color);">The Planning Task</h3>
-            <p style="margin: 1rem 0; color: var(--muted-text-color);">Move the entire stack of disks from the first tower to the last one.</p>
-            <ul style="text-align: left; margin: 1rem auto; max-width: 80%; color: var(--muted-text-color);">
-                <li>Only one disk can be moved at a time.</li>
-                <li>A larger disk cannot be placed on a smaller disk.</li>
-            </ul>
-            <p style="font-weight: bold;">Plan your moves carefully to solve each level. The challenge will grow.</p>
+            <h3 style="font-size: 1.5rem; font-weight: bold; color: var(--primary-color);">Progressive Planning Challenge</h3>
+            <p style="text-align: left; margin: 1.5rem 0; color: #ccc;">
+                Your goal is to move the entire stack of disks from the starting peg to the one on the far right.
+                <br><br>
+                <strong>How to Play:</strong>
+                <ul style="list-style-position: inside; text-align: left; margin-top: 0.5rem; margin-bottom: 1rem;">
+                    <li>Click a peg to lift the top disk.</li>
+                    <li>Click another peg to place it.</li>
+                </ul>
+
+                <strong>The Rules:</strong>
+                <ul style="list-style-position: inside; text-align: left; margin-top: 0.5rem;">
+                    <li>You can only move one disk at a time.</li>
+                    <li>A larger disk can <strong>never</strong> be placed on top of a smaller one.</li>
+                </ul>
+            </p>
+            <p style="font-weight: bold;">Aim for the fewest moves possible. The challenge will grow.</p>
             <button id="start-game-btn" class="btn" style="margin-top: 1.5rem;">Begin</button>
         </div>
     </div>

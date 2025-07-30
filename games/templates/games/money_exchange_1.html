@@ -5,6 +5,25 @@
 </div>
 
 <div class="game-container max-w-4xl mx-auto mt-8 p-6 bg-white rounded shadow">
+    <!-- Instruction Modal -->
+    <div id="instruction-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50" style="display: flex;">
+        <div class="bg-white p-8 rounded-lg shadow-xl max-w-lg w-full text-center">
+            <h2 class="text-2xl font-bold mb-4 text-blue-600">Welcome to the Trust & Economics Challenge!</h2>
+            <div class="text-left text-gray-700 space-y-3">
+                <p>In this challenge, you are an investor. Your goal is to grow your starting balance by making wise investment decisions with a partner.</p>
+                <p>Here's how it works:</p>
+                <ul class="list-disc list-inside space-y-2 pl-4">
+                    <li>Each round, you decide how much of your available money to send to your partner.</li>
+                    <li>Any amount you send is <strong>tripled</strong> by the system before it reaches your partner.</li>
+                    <li>Your partner then decides how much of that tripled amount to send back to you.</li>
+                </ul>
+                <p>Your partner's decisions are not random. They will react to your generosity (or lack thereof). Building a trusting relationship is key to maximizing your earnings.</p>
+                <p>Your balance is cumulative. Can you reach the target of <strong>$200</strong>? Good luck!</p>
+            </div>
+            <button id="start-game-btn" class="mt-6 bg-blue-500 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-600 transition-colors">Start Challenge</button>
+        </div>
+    </div>
+
     <div class="flex justify-between items-center mb-4">
         <h2 class="text-3xl font-bold text-blue-600">💰 Trust & Economics Challenge</h2>
         <div class="text-right">
@@ -650,18 +669,26 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Initialize UI
     updateUI();
-    
-    // Log game start
-    logEvent('game_start', {
-        starting_balance: balance,
-        partner_name: partnerPersonality.name,
-        partner_base_generosity: partnerPersonality.baseGenerosity,
-        target_earnings: TARGET_EARNINGS,
-        total_rounds: TOTAL_ROUNDS
+
+    const instructionModal = document.getElementById('instruction-modal');
+    const startGameBtn = document.getElementById('start-game-btn');
+
+    startGameBtn.addEventListener('click', () => {
+        instructionModal.style.display = 'none';
+        gameStartTime = Date.now();
+        
+        logEvent('game_start', {
+            starting_balance: balance,
+            partner_name: partnerPersonality.name,
+            partner_base_generosity: partnerPersonality.baseGenerosity,
+            target_earnings: TARGET_EARNINGS,
+            total_rounds: TOTAL_ROUNDS
+        });
+        
+        console.log('Enhanced Money Exchange Game #1 started!');
     });
     
     console.log('Enhanced Money Exchange Game #1 initialized!');
-    console.log('Partner:', partnerPersonality.name, 'Base generosity:', (partnerPersonality.baseGenerosity * 100).toFixed(1) + '%');
 });
 
 </script>
